@@ -281,10 +281,5 @@ export default function Chat() {
         </div>
       </div>
     </div>
-<<<<<<< Updated upstream
-  )
-}
-=======
   );
 }
->>>>>>> Stashed changes
