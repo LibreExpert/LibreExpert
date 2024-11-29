@@ -1,362 +1,290 @@
-import { useState, useRef, useEffect } from 'react'
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, Paperclip, X } from 'lucide-react'
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
-import { ChatOpenAI } from '@langchain/openai'
-import { OpenAIEmbeddings } from '@langchain/openai'
-import { MemoryVectorStore } from "langchain/vectorstores/memory"
-import { loadQAStuffChain } from "langchain/chains"
-import { Input } from "@/components/ui/input"
-import { ExpertSelector } from './ExpertSelector'
-import experts from '@/config/experts.json'
+import { useState, useEffect, useRef } from 'react';
+import { Expert } from '../types/Expert';
+import { ScrollArea } from '@radix-ui/react-scroll-area';
+import experts from '../config/experts.json';
 
 interface Message {
-  id: string
-  content: string
-  role: 'user' | 'assistant'
-  attachment?: File
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface Chat {
+  id: string;
+  expertId: string;
+  messages: Message[];
+  createdAt: string;
+  title: string;
 }
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [isApiKeySet, setIsApiKeySet] = useState(false)
-  const [attachment, setAttachment] = useState<File | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [vectorStore, setVectorStore] = useState<MemoryVectorStore | null>(null)
-  const [selectedExpert, setSelectedExpert] = useState(experts.experts[0])
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [message, setMessage] = useState('');
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [currentChat, setCurrentChat] = useState<Chat | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [selectedExpert, setSelectedExpert] = useState<Expert>(experts.experts[0]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Load chats and API key from localStorage on component mount
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('openai_api_key')
-    const savedExpertId = localStorage.getItem('selected_expert_id')
+    const savedChats = localStorage.getItem('chats');
+    const savedApiKey = localStorage.getItem('openai_api_key');
+    const savedExpertId = localStorage.getItem('selected_expert_id');
     
+    if (savedChats) {
+      setChats(JSON.parse(savedChats));
+    }
     if (savedApiKey) {
-      setApiKey('*'.repeat(savedApiKey.length))
-      setIsApiKeySet(true)
+      setApiKey(savedApiKey);
     }
-    
     if (savedExpertId) {
-      const expert = experts.experts.find(e => e.id === savedExpertId)
+      const expert = experts.experts.find(e => e.id === savedExpertId);
       if (expert) {
-        setSelectedExpert(expert)
+        setSelectedExpert(expert);
       }
     }
-  }, [])
+  }, []);
 
-  const handleExpertSelect = (expert: typeof experts.experts[0]) => {
-    setSelectedExpert(expert)
-    localStorage.setItem('selected_expert_id', expert.id)
-  }
-
-  const handleApiKeySubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (apiKey.includes('*')) return // Don't save if showing masked key
-    localStorage.setItem('openai_api_key', apiKey)
-    setApiKey('*'.repeat(apiKey.length))
-    setIsApiKeySet(true)
-  }
-
-  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setApiKey(e.target.value)
-    setIsApiKeySet(false)
-  }
-
-  const resetApiKey = () => {
-    localStorage.removeItem('openai_api_key')
-    setApiKey('')
-    setIsApiKeySet(false)
-  }
-
-  const getModel = () => {
-    const key = localStorage.getItem('openai_api_key')
-    if (!key) throw new Error('API key not set')
+  // Create new chat
+  const createNewChat = () => {
+    if (!selectedExpert) return;
     
-    return new ChatOpenAI({
-      openAIApiKey: key,
-      modelName: "gpt-4o-mini",
-      temperature: 0,
-    })
-  }
-
-  const getEmbeddings = () => {
-    const key = localStorage.getItem('openai_api_key')
-    if (!key) throw new Error('API key not set')
-    
-    return new OpenAIEmbeddings({
-      openAIApiKey: key,
-    })
-  }
-
-  const processFile = async (file: File) => {
-    try {
-      if (!isApiKeySet) {
-        throw new Error('Please set your API key first')
-      }
-
-      const text = await file.text()
-      
-      const splitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 1000,
-        chunkOverlap: 200,
-      })
-      
-      const docs = await splitter.createDocuments([text], [{
-        source: file.name,
-        type: file.type,
-        size: file.size,
-      }])
-
-      console.log('Processing file:', file.name)
-      console.log('Created chunks:', docs.length)
-      
-      const embeddings = getEmbeddings()
-      const store = await MemoryVectorStore.fromDocuments(docs, embeddings)
-      setVectorStore(store)
-      
-      console.log('File processed successfully:', file.name)
-    } catch (error) {
-      console.error('Error processing file:', error)
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        content: 'Error processing file: ' + (error instanceof Error ? error.message : 'Unknown error occurred'),
-        role: 'assistant'
-      }
-      setMessages(prev => [...prev, errorMessage])
-    }
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setAttachment(file)
-      await processFile(file)
-    }
-  }
-
-  const removeAttachment = () => {
-    setAttachment(null)
-    setVectorStore(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if ((!input.trim() && !attachment) || isLoading || !isApiKeySet) return
-
-    const userMessage: Message = {
+    const newChat: Chat = {
       id: Date.now().toString(),
-      content: input,
-      role: 'user',
-      attachment: attachment || undefined
+      expertId: selectedExpert.id,
+      messages: [],
+      createdAt: new Date().toISOString(),
+      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`
+    };
+    setChats(prev => {
+      const updatedChats = [newChat, ...prev];
+      localStorage.setItem('chats', JSON.stringify(updatedChats));
+      return updatedChats;
+    });
+    setCurrentChat(newChat);
+  };
+
+  // Handle expert selection
+  const handleExpertSelect = (expertId: string) => {
+    const expert = experts.experts.find(e => e.id === expertId);
+    if (expert) {
+      setSelectedExpert(expert);
+      localStorage.setItem('selected_expert_id', expert.id);
+      setCurrentChat(null);
     }
+  };
 
-    setMessages(prev => [...prev, userMessage])
-    setInput('')
-    
-    setIsLoading(true)
-
-    try {
-      let response: string
-      const model = getModel()
-
-      if (vectorStore) {
-        // Use RAG if we have documents loaded
-        const relevantDocs = await vectorStore.similaritySearch(input, 3)
-        const chain = loadQAStuffChain(model)
-        
-        const context = relevantDocs
-          .map(doc => `Content: ${doc.pageContent}\nSource: ${doc.metadata.source || 'Unknown'}`)
-          .join('\n\n')
-
-        const prompt = `
-${selectedExpert.systemPrompt}
-
-Context from uploaded documents:
-${context}
-
-Based on the above context, please answer this question:
-${input}
-
-If the answer cannot be found in the context, please say so. Always reference the source of information when possible.`
-
-        const result = await chain.call({
-          input_documents: relevantDocs,
-          question: prompt,
-        })
-        response = result.text
-      } else {
-        // Regular chat if no documents loaded
-        const completion = await model.call([
-          { role: 'system', content: selectedExpert.systemPrompt },
-          { role: 'user', content: input }
-        ])
-        
-        if (typeof completion.content === 'string') {
-          response = completion.content
-        } else if (Array.isArray(completion.content)) {
-          response = completion.content
-            .filter(content => 
-              typeof content === 'object' && 
-              'type' in content && 
-              content.type === 'text' && 
-              'text' in content
-            )
-            .map(content => String((content as { text: string }).text))
-            .join(' ')
-        } else {
-          response = String(completion.content)
-        }
-      }
-
-      const assistantMessage: Message = {
-        id: Date.now().toString(),
-        content: response || 'Sorry, I could not generate a response.',
-        role: 'assistant'
-      }
-
-      setMessages(prev => [...prev, assistantMessage])
-    } catch (error) {
-      console.error('Error:', error)
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        content: 'Error: ' + (error instanceof Error ? error.message : 'Unknown error occurred'),
-        role: 'assistant'
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
+  // Auto-adjust textarea height
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
     }
-  }, [input])
+  }, [message]);
+
+  // Send message
+  const sendMessage = async () => {
+    if (!message.trim() || !apiKey || !selectedExpert) return;
+
+    const updatedChat: Chat = currentChat ? { ...currentChat } : {
+      id: Date.now().toString(),
+      expertId: selectedExpert.id,
+      messages: [],
+      createdAt: new Date().toISOString(),
+      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`
+    };
+
+    const newMessage: Message = { role: 'user', content: message };
+    updatedChat.messages = [...updatedChat.messages, newMessage];
+
+    try {
+      // Update chat state
+      if (!currentChat) {
+        setChats(prev => {
+          const newChats = [updatedChat, ...prev];
+          localStorage.setItem('chats', JSON.stringify(newChats));
+          return newChats;
+        });
+        setCurrentChat(updatedChat);
+      } else {
+        setChats(prev => {
+          const newChats = prev.map(chat => 
+            chat.id === currentChat.id ? updatedChat : chat
+          );
+          localStorage.setItem('chats', JSON.stringify(newChats));
+          return newChats;
+        });
+        setCurrentChat(updatedChat);
+      }
+
+      // Call OpenAI API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4-1106-preview',
+          messages: [
+            { role: 'system', content: selectedExpert.systemPrompt },
+            ...updatedChat.messages
+          ],
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+
+      const data = await response.json();
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: data.choices[0].message.content
+      };
+
+      // Update chat with AI response
+      const chatWithResponse = {
+        ...updatedChat,
+        messages: [...updatedChat.messages, assistantMessage]
+      };
+
+      setChats(prev => {
+        const newChats = prev.map(chat => 
+          chat.id === chatWithResponse.id ? chatWithResponse : chat
+        );
+        localStorage.setItem('chats', JSON.stringify(newChats));
+        return newChats;
+      });
+      setCurrentChat(chatWithResponse);
+
+    } catch (error) {
+      console.error('Error:', error);
+    }
+
+    setMessage('');
+  };
+
+  // Render API key input if not set
+  if (!apiKey) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="w-96 p-6 bg-white rounded-lg shadow-lg">
+          <h2 className="text-xl font-bold mb-4">Введите API ключ OpenAI</h2>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => {
+              setApiKey(e.target.value);
+              localStorage.setItem('openai_api_key', e.target.value);
+            }}
+            placeholder="sk-..."
+            className="w-full p-2 border rounded mb-4"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <div className="flex-1 space-y-4">
-        {!isApiKeySet && (
-          <form onSubmit={handleApiKeySubmit} className="max-w-sm mx-auto p-4 space-y-4">
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold">Enter OpenAI API Key</h2>
-              <p className="text-sm text-gray-500">Your API key will be stored locally in your browser.</p>
-            </div>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                value={apiKey}
-                onChange={handleApiKeyChange}
-                placeholder="sk-..."
-                className="flex-1"
-              />
-              <Button type="submit" disabled={!apiKey || apiKey.includes('*')}>
-                Save
-              </Button>
-            </div>
-          </form>
-        )}
+    <div className="flex h-screen">
+      {/* Sidebar */}
+      <div className="w-64 bg-gray-100 border-r border-gray-200 p-4">
+        {/* Expert Selector */}
+        <div className="mb-4">
+          <select
+            value={selectedExpert.id}
+            onChange={(e) => handleExpertSelect(e.target.value)}
+            className="w-full p-2 border rounded"
+          >
+            {experts.experts.map(expert => (
+              <option key={expert.id} value={expert.id}>
+                {expert.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        {isApiKeySet && (
-          <>
-            <div className="max-w-sm mx-auto p-4">
-              <h2 className="text-lg font-semibold mb-4">Select Expert</h2>
-              <ExpertSelector
-                onSelect={handleExpertSelect}
-                selectedExpertId={selectedExpert.id}
-              />
-            </div>
+        <button
+          onClick={createNewChat}
+          className="w-full bg-blue-500 text-white rounded-lg px-4 py-2 mb-4 hover:bg-blue-600"
+        >
+          Новый чат
+        </button>
 
-            <div className="flex items-center justify-between max-w-sm mx-auto px-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span className="text-sm">API Key: {apiKey}</span>
-              </div>
-              <Button variant="outline" size="sm" onClick={resetApiKey}>
-                Reset Key
-              </Button>
-            </div>
-
-            <ScrollArea className="h-[calc(100vh-400px)] rounded-md border">
-              <div className="p-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`mb-4 flex flex-col ${
-                      message.role === 'assistant' ? 'items-start' : 'items-end'
-                    }`}
-                  >
-                    <div
-                      className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                        message.role === 'assistant'
-                          ? 'bg-muted'
-                          : 'bg-primary text-primary-foreground'
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-
-            <div className="max-w-2xl mx-auto px-4">
-              <form onSubmit={handleSubmit} className="flex items-center gap-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
+        <ScrollArea className="h-[calc(100vh-200px)]">
+          <div className="space-y-2">
+            {chats
+              .filter(chat => chat.expertId === selectedExpert.id)
+              .map(chat => (
+                <div
+                  key={chat.id}
+                  onClick={() => setCurrentChat(chat)}
+                  className={`p-2 rounded-lg cursor-pointer ${
+                    currentChat?.id === chat.id ? 'bg-blue-100' : 'hover:bg-gray-200'
+                  }`}
                 >
-                  <Paperclip className="h-4 w-4" />
-                  <span className="sr-only">Attach file</span>
-                </Button>
-                {attachment && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span>{attachment.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={removeAttachment}
-                    >
-                      <X className="h-4 w-4" />
-                      <span className="sr-only">Remove attachment</span>
-                    </Button>
+                  <div className="text-sm font-medium truncate">{chat.title}</div>
+                  <div className="text-xs text-gray-500">
+                    {new Date(chat.createdAt).toLocaleDateString()}
                   </div>
-                )}
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={isApiKeySet ? "Type your message..." : "Please set your API key first"}
-                  disabled={!isApiKeySet}
-                  className="flex-1 min-h-[40px] max-h-[100px] p-2 rounded-md border border-input bg-background text-sm resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  rows={1}
-                />
-                <Button type="submit" size="icon" disabled={isLoading || !isApiKeySet}>
-                  <Send className="h-4 w-4" />
-                  <span className="sr-only">Send message</span>
-                </Button>
-              </form>
-            </div>
-          </>
-        )}
+                </div>
+              ))}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Messages */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
+            {currentChat?.messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`p-4 rounded-lg ${
+                  msg.role === 'user'
+                    ? 'bg-blue-100 ml-auto max-w-[80%]'
+                    : 'bg-gray-100 mr-auto max-w-[80%]'
+                }`}
+              >
+                {msg.content}
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+
+        {/* Input Area */}
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex space-x-4">
+            <textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Введите сообщение..."
+              className="flex-1 resize-none border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={1}
+            />
+            <button
+              onClick={sendMessage}
+              className="bg-blue-500 text-white rounded-lg px-6 py-2 hover:bg-blue-600"
+            >
+              Отправить
+            </button>
+          </div>
+        </div>
       </div>
     </div>
+<<<<<<< Updated upstream
   )
 }
+=======
+  );
+}
+>>>>>>> Stashed changes
