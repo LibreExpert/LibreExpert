@@ -14,6 +14,8 @@ interface Chat {
   messages: Message[];
   createdAt: string;
   title: string;
+  lastActivity: number;
+  problemResolved?: boolean;
 }
 
 export default function Chat() {
@@ -23,6 +25,10 @@ export default function Chat() {
   const [apiKey, setApiKey] = useState('');
   const [selectedExpert, setSelectedExpert] = useState<Expert>(experts.experts[0]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Constants
+  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
   // Load chats and API key from localStorage on component mount
   useEffect(() => {
@@ -44,6 +50,53 @@ export default function Chat() {
     }
   }, []);
 
+  // Check for inactivity
+  useEffect(() => {
+    const checkInactivity = async () => {
+      if (currentChat && !currentChat.problemResolved) {
+        const timeSinceLastActivity = Date.now() - currentChat.lastActivity;
+        
+        if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
+          const inactivityMessage: Message = {
+            role: 'assistant',
+            content: 'Я заметил, что прошло некоторое время с нашего последнего взаимодействия. Удалось ли решить вашу проблему? Если нет, я готов продолжить помогать.'
+          };
+
+          const updatedChat = {
+            ...currentChat,
+            messages: [...currentChat.messages, inactivityMessage]
+          };
+
+          setChats(prev => {
+            const newChats = prev.map(chat => 
+              chat.id === currentChat.id ? updatedChat : chat
+            );
+            localStorage.setItem('chats', JSON.stringify(newChats));
+            return newChats;
+          });
+          setCurrentChat(updatedChat);
+        }
+      }
+    };
+
+    // Clear existing timeout
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+
+    // Set new timeout
+    if (currentChat && !currentChat.problemResolved) {
+      inactivityTimeoutRef.current = setTimeout(checkInactivity, INACTIVITY_TIMEOUT);
+    }
+
+    // Cleanup
+    return () => {
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+      }
+    };
+  }, [currentChat]);
+
   // Create new chat
   const createNewChat = () => {
     if (!selectedExpert) return;
@@ -53,7 +106,9 @@ export default function Chat() {
       expertId: selectedExpert.id,
       messages: [],
       createdAt: new Date().toISOString(),
-      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`
+      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`,
+      lastActivity: Date.now(),
+      problemResolved: false
     };
     setChats(prev => {
       const updatedChats = [newChat, ...prev];
@@ -73,6 +128,54 @@ export default function Chat() {
     }
   };
 
+  // Handle problem resolution response
+  const handleProblemResolution = async (resolved: boolean) => {
+    if (!currentChat) return;
+
+    const resolutionMessage: Message = {
+      role: 'user',
+      content: resolved ? 'Да, моя проблема решена. Спасибо!' : 'Нет, мне всё ещё нужна помощь.'
+    };
+
+    const updatedChat = {
+      ...currentChat,
+      messages: [...currentChat.messages, resolutionMessage],
+      lastActivity: Date.now(),
+      problemResolved: resolved
+    };
+
+    setChats(prev => {
+      const newChats = prev.map(chat => 
+        chat.id === currentChat.id ? updatedChat : chat
+      );
+      localStorage.setItem('chats', JSON.stringify(newChats));
+      return newChats;
+    });
+    setCurrentChat(updatedChat);
+
+    if (!resolved) {
+      // Send follow-up message
+      const followUpMessage: Message = {
+        role: 'assistant',
+        content: 'Понятно. Давайте продолжим работу над вашей проблемой. Что именно осталось нерешённым?'
+      };
+
+      const chatWithFollowUp = {
+        ...updatedChat,
+        messages: [...updatedChat.messages, followUpMessage]
+      };
+
+      setChats(prev => {
+        const newChats = prev.map(chat => 
+          chat.id === currentChat.id ? chatWithFollowUp : chat
+        );
+        localStorage.setItem('chats', JSON.stringify(newChats));
+        return newChats;
+      });
+      setCurrentChat(chatWithFollowUp);
+    }
+  };
+
   // Auto-adjust textarea height
   useEffect(() => {
     if (textareaRef.current) {
@@ -85,12 +188,17 @@ export default function Chat() {
   const sendMessage = async () => {
     if (!message.trim() || !apiKey || !selectedExpert) return;
 
-    const updatedChat: Chat = currentChat ? { ...currentChat } : {
+    const updatedChat: Chat = currentChat ? {
+      ...currentChat,
+      lastActivity: Date.now()
+    } : {
       id: Date.now().toString(),
       expertId: selectedExpert.id,
       messages: [],
       createdAt: new Date().toISOString(),
-      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`
+      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`,
+      lastActivity: Date.now(),
+      problemResolved: false
     };
 
     const newMessage: Message = { role: 'user', content: message };
@@ -146,7 +254,8 @@ export default function Chat() {
       // Update chat with AI response
       const chatWithResponse = {
         ...updatedChat,
-        messages: [...updatedChat.messages, assistantMessage]
+        messages: [...updatedChat.messages, assistantMessage],
+        lastActivity: Date.now()
       };
 
       setChats(prev => {
@@ -228,6 +337,9 @@ export default function Chat() {
                   <div className="text-xs text-gray-500">
                     {new Date(chat.createdAt).toLocaleDateString()}
                   </div>
+                  {chat.problemResolved && (
+                    <div className="text-xs text-green-500">Решено ✓</div>
+                  )}
                 </div>
               ))}
           </div>
@@ -249,6 +361,24 @@ export default function Chat() {
                 }`}
               >
                 {msg.content}
+                {msg.role === 'assistant' && 
+                 msg.content.includes('Удалось ли решить вашу проблему?') && 
+                 !currentChat.problemResolved && (
+                  <div className="mt-2 flex space-x-2">
+                    <button
+                      onClick={() => handleProblemResolution(true)}
+                      className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                    >
+                      Да, решено
+                    </button>
+                    <button
+                      onClick={() => handleProblemResolution(false)}
+                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Нет, нужна помощь
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
