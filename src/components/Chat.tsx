@@ -6,6 +6,7 @@ import experts from '../config/experts.json';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  timestamp?: number;
 }
 
 interface Chat {
@@ -59,7 +60,8 @@ export default function Chat() {
         if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
           const inactivityMessage: Message = {
             role: 'assistant',
-            content: 'Я заметил, что прошло некоторое время с нашего последнего взаимодействия. Удалось ли решить вашу проблему? Если нет, я готов продолжить помогать.'
+            content: 'Я заметил, что прошло некоторое время с нашего последнего взаимодействия. Удалось ли решить вашу проблему? Если нет, я готов продолжить помогать.',
+            timestamp: Date.now()
           };
 
           const updatedChat = {
@@ -134,7 +136,8 @@ export default function Chat() {
 
     const resolutionMessage: Message = {
       role: 'user',
-      content: resolved ? 'Да, моя проблема решена. Спасибо!' : 'Нет, мне всё ещё нужна помощь.'
+      content: resolved ? 'Да, моя проблема решена. Спасибо!' : 'Нет, мне всё ещё нужна помощь.',
+      timestamp: Date.now()
     };
 
     const updatedChat = {
@@ -157,7 +160,8 @@ export default function Chat() {
       // Send follow-up message
       const followUpMessage: Message = {
         role: 'assistant',
-        content: 'Понятно. Давайте продолжим работу над вашей проблемой. Что именно осталось нерешённым?'
+        content: 'Понятно. Давайте продолжим работу над вашей проблемой. Что именно осталось нерешённым?',
+        timestamp: Date.now()
       };
 
       const chatWithFollowUp = {
@@ -201,7 +205,11 @@ export default function Chat() {
       problemResolved: false
     };
 
-    const newMessage: Message = { role: 'user', content: message };
+    const newMessage: Message = { 
+      role: 'user', 
+      content: message,
+      timestamp: Date.now()
+    };
     updatedChat.messages = [...updatedChat.messages, newMessage];
 
     try {
@@ -248,7 +256,8 @@ export default function Chat() {
       const data = await response.json();
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.choices[0].message.content
+        content: data.choices[0].message.content,
+        timestamp: Date.now()
       };
 
       // Update chat with AI response
@@ -354,31 +363,47 @@ export default function Chat() {
             {currentChat?.messages.map((msg, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-lg ${
-                  msg.role === 'user'
-                    ? 'bg-blue-100 ml-auto max-w-[80%]'
-                    : 'bg-gray-100 mr-auto max-w-[80%]'
+                className={`flex items-start space-x-2 ${
+                  msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                 }`}
               >
-                {msg.content}
-                {msg.role === 'assistant' && 
-                 msg.content.includes('Удалось ли решить вашу проблему?') && 
-                 !currentChat.problemResolved && (
-                  <div className="mt-2 flex space-x-2">
-                    <button
-                      onClick={() => handleProblemResolution(true)}
-                      className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                    >
-                      Да, решено
-                    </button>
-                    <button
-                      onClick={() => handleProblemResolution(false)}
-                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Нет, нужна помощь
-                    </button>
-                  </div>
-                )}
+                <div
+                  className={`p-4 rounded-lg relative ${
+                    msg.role === 'user'
+                      ? 'bg-blue-100 ml-auto max-w-[80%]'
+                      : 'bg-gray-100 mr-auto max-w-[80%]'
+                  }`}
+                >
+                  {msg.content}
+                  {msg.role === 'assistant' && 
+                   msg.content.includes('Удалось ли решить вашу проблему?') && 
+                   !currentChat.problemResolved && (
+                    <div className="mt-2 flex space-x-2">
+                      <button
+                        onClick={() => handleProblemResolution(true)}
+                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        Да, решено
+                      </button>
+                      <button
+                        onClick={() => handleProblemResolution(false)}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        Нет, нужна помощь
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className={`text-xs text-gray-500 self-end mb-2 ${
+                  msg.role === 'user' ? 'text-right' : 'text-left'
+                }`}>
+                  {msg.timestamp 
+                    ? new Date(msg.timestamp).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })
+                    : ''}
+                </div>
               </div>
             ))}
           </div>
