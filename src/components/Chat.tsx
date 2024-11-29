@@ -363,18 +363,24 @@ export default function Chat() {
             {currentChat?.messages.map((msg, index) => (
               <div
                 key={index}
-                className={`flex items-start space-x-2 ${
-                  msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                }`}
+                className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
               >
                 <div
-                  className={`p-4 rounded-lg relative ${
+                  className={`p-4 rounded-lg relative max-w-[80%] ${
                     msg.role === 'user'
-                      ? 'bg-blue-100 ml-auto max-w-[80%]'
-                      : 'bg-gray-100 mr-auto max-w-[80%]'
+                      ? 'bg-blue-100'
+                      : 'bg-gray-100'
                   }`}
                 >
-                  {msg.content}
+                  <div className="mb-1">{msg.content}</div>
+                  <div className="text-xs text-gray-500 mt-1 text-right">
+                    {msg.timestamp 
+                      ? new Date(msg.timestamp).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })
+                      : ''}
+                  </div>
                   {msg.role === 'assistant' && 
                    msg.content.includes('Удалось ли решить вашу проблему?') && 
                    !currentChat.problemResolved && (
@@ -393,16 +399,6 @@ export default function Chat() {
                       </button>
                     </div>
                   )}
-                </div>
-                <div className={`text-xs text-gray-500 self-end mb-2 ${
-                  msg.role === 'user' ? 'text-right' : 'text-left'
-                }`}>
-                  {msg.timestamp 
-                    ? new Date(msg.timestamp).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })
-                    : ''}
                 </div>
               </div>
             ))}
