@@ -8,6 +8,8 @@ import { OpenAIEmbeddings } from '@langchain/openai'
 import { MemoryVectorStore } from "langchain/vectorstores/memory"
 import { loadQAStuffChain } from "langchain/chains"
 import { Input } from "@/components/ui/input"
+import { ExpertSelector } from './ExpertSelector'
+import experts from '@/config/experts.json'
 
 interface Message {
   id: string
@@ -24,16 +26,31 @@ export default function Chat() {
   const [attachment, setAttachment] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [vectorStore, setVectorStore] = useState<MemoryVectorStore | null>(null)
+  const [selectedExpert, setSelectedExpert] = useState(experts.experts[0])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const savedApiKey = localStorage.getItem('openai_api_key')
+    const savedExpertId = localStorage.getItem('selected_expert_id')
+    
     if (savedApiKey) {
       setApiKey('*'.repeat(savedApiKey.length))
       setIsApiKeySet(true)
     }
+    
+    if (savedExpertId) {
+      const expert = experts.experts.find(e => e.id === savedExpertId)
+      if (expert) {
+        setSelectedExpert(expert)
+      }
+    }
   }, [])
+
+  const handleExpertSelect = (expert: typeof experts.experts[0]) => {
+    setSelectedExpert(expert)
+    localStorage.setItem('selected_expert_id', expert.id)
+  }
 
   const handleApiKeySubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -153,13 +170,13 @@ export default function Chat() {
         const relevantDocs = await vectorStore.similaritySearch(input, 3)
         const chain = loadQAStuffChain(model)
         
-        // Prepare context from relevant documents
         const context = relevantDocs
           .map(doc => `Content: ${doc.pageContent}\nSource: ${doc.metadata.source || 'Unknown'}`)
           .join('\n\n')
 
-        // Create a detailed prompt
         const prompt = `
+${selectedExpert.systemPrompt}
+
 Context from uploaded documents:
 ${context}
 
@@ -175,11 +192,22 @@ If the answer cannot be found in the context, please say so. Always reference th
         response = result.text
       } else {
         // Regular chat if no documents loaded
-        const completion = await model.invoke(input)
-        if (Array.isArray(completion.content)) {
+        const completion = await model.call([
+          { role: 'system', content: selectedExpert.systemPrompt },
+          { role: 'user', content: input }
+        ])
+        
+        if (typeof completion.content === 'string') {
           response = completion.content
-            .filter(c => 'type' in c && c.type === 'text')
-            .map(c => ('text' in c ? c.text : ''))
+        } else if (Array.isArray(completion.content)) {
+          response = completion.content
+            .filter(content => 
+              typeof content === 'object' && 
+              'type' in content && 
+              content.type === 'text' && 
+              'text' in content
+            )
+            .map(content => String((content as { text: string }).text))
             .join(' ')
         } else {
           response = String(completion.content)
@@ -238,86 +266,96 @@ If the answer cannot be found in the context, please say so. Always reference th
         )}
 
         {isApiKeySet && (
-          <div className="flex items-center justify-between max-w-sm mx-auto p-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
-              <span className="text-sm">API Key: {apiKey}</span>
+          <>
+            <div className="max-w-sm mx-auto p-4">
+              <h2 className="text-lg font-semibold mb-4">Select Expert</h2>
+              <ExpertSelector
+                onSelect={handleExpertSelect}
+                selectedExpertId={selectedExpert.id}
+              />
             </div>
-            <Button variant="outline" size="sm" onClick={resetApiKey}>
-              Reset Key
-            </Button>
-          </div>
-        )}
 
-        <ScrollArea className="h-[calc(100vh-200px)] rounded-md border">
-          <div className="p-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`mb-4 flex flex-col ${
-                  message.role === 'assistant' ? 'items-start' : 'items-end'
-                }`}
-              >
-                <div
-                  className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                    message.role === 'assistant'
-                      ? 'bg-muted'
-                      : 'bg-primary text-primary-foreground'
-                  }`}
-                >
-                  {message.content}
-                </div>
+            <div className="flex items-center justify-between max-w-sm mx-auto px-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full" />
+                <span className="text-sm">API Key: {apiKey}</span>
               </div>
-            ))}
-          </div>
-        </ScrollArea>
+              <Button variant="outline" size="sm" onClick={resetApiKey}>
+                Reset Key
+              </Button>
+            </div>
 
-        <div className="max-w-2xl mx-auto px-4">
-          <form onSubmit={handleSubmit} className="flex items-center gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip className="h-4 w-4" />
-              <span className="sr-only">Attach file</span>
-            </Button>
-            {attachment && (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span>{attachment.name}</span>
+            <ScrollArea className="h-[calc(100vh-400px)] rounded-md border">
+              <div className="p-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`mb-4 flex flex-col ${
+                      message.role === 'assistant' ? 'items-start' : 'items-end'
+                    }`}
+                  >
+                    <div
+                      className={`rounded-lg px-4 py-2 max-w-[80%] ${
+                        message.role === 'assistant'
+                          ? 'bg-muted'
+                          : 'bg-primary text-primary-foreground'
+                      }`}
+                    >
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            <div className="max-w-2xl mx-auto px-4">
+              <form onSubmit={handleSubmit} className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
-                  onClick={removeAttachment}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Remove attachment</span>
+                  <Paperclip className="h-4 w-4" />
+                  <span className="sr-only">Attach file</span>
                 </Button>
-              </div>
-            )}
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={isApiKeySet ? "Type your message..." : "Please set your API key first"}
-              disabled={!isApiKeySet}
-              className="flex-1 min-h-[40px] max-h-[100px] p-2 rounded-md border border-input bg-background text-sm resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              rows={1}
-            />
-            <Button type="submit" size="icon" disabled={isLoading || !isApiKeySet}>
-              <Send className="h-4 w-4" />
-              <span className="sr-only">Send message</span>
-            </Button>
-          </form>
-        </div>
+                {attachment && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span>{attachment.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={removeAttachment}
+                    >
+                      <X className="h-4 w-4" />
+                      <span className="sr-only">Remove attachment</span>
+                    </Button>
+                  </div>
+                )}
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={isApiKeySet ? "Type your message..." : "Please set your API key first"}
+                  disabled={!isApiKeySet}
+                  className="flex-1 min-h-[40px] max-h-[100px] p-2 rounded-md border border-input bg-background text-sm resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  rows={1}
+                />
+                <Button type="submit" size="icon" disabled={isLoading || !isApiKeySet}>
+                  <Send className="h-4 w-4" />
+                  <span className="sr-only">Send message</span>
+                </Button>
+              </form>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
