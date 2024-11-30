@@ -1,12 +1,10 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   darkMode: ["class"],
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-    "./pages/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     container: {
@@ -71,10 +69,73 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: '100ch',
+            color: 'inherit',
+            a: {
+              color: 'inherit',
+              textDecoration: 'none',
+              fontWeight: '500',
+            },
+            '[class~="lead"]': {
+              color: 'inherit',
+            },
+            strong: {
+              color: 'inherit',
+            },
+            'ul > li::before': {
+              backgroundColor: 'currentColor',
+            },
+            hr: {
+              borderColor: 'currentColor',
+              opacity: 0.3,
+            },
+            blockquote: {
+              borderLeftColor: 'currentColor',
+              opacity: 0.8,
+            },
+            h1: {
+              color: 'inherit',
+            },
+            h2: {
+              color: 'inherit',
+            },
+            h3: {
+              color: 'inherit',
+            },
+            h4: {
+              color: 'inherit',
+            },
+            'figure figcaption': {
+              color: 'inherit',
+            },
+            code: {
+              color: 'inherit',
+            },
+            'a code': {
+              color: 'inherit',
+            },
+            pre: {
+              color: 'inherit',
+              backgroundColor: 'transparent',
+            },
+            thead: {
+              color: 'inherit',
+              borderBottomColor: 'currentColor',
+            },
+            'tbody tr': {
+              borderBottomColor: 'currentColor',
+              opacity: 0.8,
+            },
+          },
+        },
+      },
     },
   },
   plugins: [
     require("tailwindcss-animate"),
     require('@tailwindcss/typography'),
   ],
-};
+}

@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import Chat from './components/Chat'
+import Chat from '../components/Chat'
 import Settings from './pages/Settings'
 
 function App() {

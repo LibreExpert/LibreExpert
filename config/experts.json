@@ -1,0 +1,38 @@
+{
+  "experts": [
+    {
+      "id": "gpt4",
+      "name": "GPT-4",
+      "description": "Продвинутая модель для сложных задач",
+      "model": "gpt-4",
+      "provider": "openai",
+      "temperature": 0.7,
+      "presence_penalty": 0,
+      "frequency_penalty": 0,
+      "top_p": 1,
+      "systemPrompt": "Вы - GPT-4, продвинутый AI ассистент.",
+      "capabilities": {
+        "webBrowsing": false,
+        "imageGeneration": false,
+        "codeInterpreter": true
+      }
+    },
+    {
+      "id": "gemini-pro",
+      "name": "Gemini Pro",
+      "description": "Универсальная модель от Google",
+      "model": "gemini-pro",
+      "provider": "google",
+      "temperature": 0.7,
+      "presence_penalty": 0,
+      "frequency_penalty": 0,
+      "top_p": 1,
+      "systemPrompt": "Вы - Gemini Pro, универсальный AI ассистент от Google.",
+      "capabilities": {
+        "webBrowsing": false,
+        "imageGeneration": false,
+        "codeInterpreter": true
+      }
+    }
+  ]
+}

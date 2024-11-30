@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { Expert } from '../types/Expert';
@@ -390,7 +392,7 @@ export default function Chat() {
                               (child): child is React.ReactElement => 
                                 React.isValidElement(child) && child.type === 'code'
                             );
-                            
+                             
                             return (
                               <div className="relative group">
                                 <pre {...props} className="bg-gray-900 p-4 rounded-lg overflow-x-auto">

@@ -1,6 +1,8 @@
+'use client'
+
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Button } from '../components/ui/button'
+import { Card } from '../components/ui/card'
 import { toast } from 'sonner'
 import CreateAssistant from './CreateAssistant'
 import { Pencil, Trash2, Plus } from 'lucide-react'
