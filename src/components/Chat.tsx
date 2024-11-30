@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Expert } from '../types/Expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import experts from '../config/experts.json';
+import { AIService } from '../services/ai.service';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -27,6 +28,7 @@ export default function Chat() {
   const [selectedExpert, setSelectedExpert] = useState<Expert>(experts.experts[0]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const aiServiceRef = useRef<AIService | null>(null);
 
   // Constants
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -50,6 +52,20 @@ export default function Chat() {
       }
     }
   }, []);
+
+  // Initialize AI service when API key or expert changes
+  useEffect(() => {
+    if (apiKey && selectedExpert) {
+      aiServiceRef.current = new AIService(
+        apiKey,
+        selectedExpert.model,
+        selectedExpert.temperature,
+        selectedExpert.presence_penalty,
+        selectedExpert.frequency_penalty,
+        selectedExpert.top_p
+      );
+    }
+  }, [apiKey, selectedExpert]);
 
   // Check for inactivity
   useEffect(() => {
@@ -97,7 +113,7 @@ export default function Chat() {
         clearTimeout(inactivityTimeoutRef.current);
       }
     };
-  }, [currentChat]);
+  }, [currentChat, INACTIVITY_TIMEOUT]);
 
   // Create new chat
   const createNewChat = () => {
@@ -190,7 +206,7 @@ export default function Chat() {
 
   // Send message
   const sendMessage = async () => {
-    if (!message.trim() || !apiKey || !selectedExpert) return;
+    if (!message.trim() || !apiKey || !selectedExpert || !aiServiceRef.current) return;
 
     const updatedChat: Chat = currentChat ? {
       ...currentChat,
@@ -232,31 +248,15 @@ export default function Chat() {
         setCurrentChat(updatedChat);
       }
 
-      // Call OpenAI API
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4-1106-preview',
-          messages: [
-            { role: 'system', content: selectedExpert.systemPrompt },
-            ...updatedChat.messages
-          ],
-          temperature: 0.7
-        })
-      });
+      // Generate response using LangChain
+      const responseContent = await aiServiceRef.current.generateResponse(
+        selectedExpert.systemPrompt,
+        updatedChat.messages
+      );
 
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
-
-      const data = await response.json();
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.choices[0].message.content,
+        content: responseContent,
         timestamp: Date.now()
       };
 
