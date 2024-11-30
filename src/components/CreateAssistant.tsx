@@ -7,10 +7,12 @@ import { Card } from "./ui/card"
 import { Send, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { AIService } from '@/services/ai.service'
+import { HumanMessage } from '@langchain/core/messages'
 
 interface AssistantConfig {
   id: string;
   model: string;
+  provider: 'openai' | 'google';
   temperature: number;
   presence_penalty: number;
   frequency_penalty: number;
@@ -26,7 +28,7 @@ interface AssistantConfig {
 }
 
 interface ChatMessage {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
 }
 
@@ -39,7 +41,8 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
   const [config, setConfig] = useState<AssistantConfig>(
     initialConfig || {
       id: '',
-      model: 'gpt-4o-mini',
+      model: 'gpt-4',
+      provider: 'openai',
       temperature: 0.7,
       presence_penalty: 0.6,
       frequency_penalty: 0.5,
@@ -63,6 +66,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
     const stored = localStorage.getItem('experts')
     return stored ? JSON.parse(stored) : []
   })
+  const [testing, setTesting] = useState(false)
 
   useEffect(() => {
     if (apiKey) {
@@ -73,7 +77,8 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         config.temperature,
         config.presence_penalty,
         config.frequency_penalty,
-        config.top_p
+        config.top_p,
+        config.provider
       ))
     } else {
       setAiService(null)
@@ -102,7 +107,8 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       if (!initialConfig) {
         setConfig({
           id: '',
-          model: 'gpt-4o-mini',
+          model: 'gpt-4',
+          provider: 'openai',
           temperature: 0.7,
           presence_penalty: 0.6,
           frequency_penalty: 0.5,
@@ -126,6 +132,38 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
     }
   }
 
+  const testConnection = async () => {
+    if (!apiKey) {
+      toast.error('API ключ не указан');
+      return;
+    }
+
+    setTesting(true);
+    try {
+      const ai = new AIService(
+        apiKey,
+        config.model,
+        config.temperature,
+        config.presence_penalty,
+        config.frequency_penalty,
+        config.top_p,
+        config.provider
+      );
+
+      const testMessage = new HumanMessage('Привет! Это тестовое сообщение.');
+      const response = await ai.generateResponse(config.systemPrompt, [testMessage]);
+      
+      if (response) {
+        toast.success('Соединение успешно установлено');
+      }
+    } catch (error) {
+      console.error('Test connection error:', error);
+      toast.error('Ошибка подключения');
+    } finally {
+      setTesting(false);
+    }
+  };
+
   async function handleSendMessage() {
     if (!inputMessage.trim() || !aiService) return
 
@@ -138,8 +176,13 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
     setInputMessage('')
 
     try {
-      const systemPrompt = config.systemPrompt || 'You are a helpful AI assistant.'
-      const response = await aiService.generateResponse(systemPrompt, [...chatMessages, newMessage])
+      const messages = [
+        { role: 'system', content: config.systemPrompt || 'You are a helpful AI assistant.' },
+        ...chatMessages,
+        newMessage
+      ];
+      const humanMessages = messages.map(message => new HumanMessage(message.content));
+      const response = await aiService.generateResponse(config.systemPrompt, humanMessages);
       
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -173,6 +216,14 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
           className="px-4"
         >
           Сохранить
+        </Button>
+        <Button
+          variant="default"
+          onClick={testConnection}
+          disabled={testing}
+          className="px-4"
+        >
+          {testing ? 'Тестирую...' : 'Тестировать'}
         </Button>
       </header>
 
@@ -223,83 +274,117 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
               />
             </div>
 
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Провайдер
+              </label>
+              <select
+                value={config.provider}
+                onChange={(e) => {
+                  const provider = e.target.value as 'openai' | 'google';
+                  setConfig({ 
+                    ...config, 
+                    provider,
+                    // Устанавливаем модель по умолчанию для выбранного провайдера
+                    model: provider === 'openai' ? 'gpt-4' : 'gemini-pro'
+                  })
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="openai">OpenAI</option>
+                <option value="google">Google Gemini</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Модель
+              </label>
+              <select
+                value={config.model}
+                onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {config.provider === 'openai' ? (
+                  <>
+                    <option value="gpt-4o">gpt-4o</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
+                  </>
+                )}
+              </select>
+            </div>
+
             <div className="space-y-6">
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">Модель</label>
+                  <label className="text-sm font-medium mb-1.5 block">Temperature</label>
                   <Input
-                    value={config.model}
-                    onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={config.temperature}
+                    onChange={(e) =>
+                      setConfig({ ...config, temperature: parseFloat(e.target.value) })
+                    }
                     className="w-[180px]"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block">Temperature</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={2}
-                      step={0.1}
-                      value={config.temperature}
-                      onChange={(e) =>
-                        setConfig({ ...config, temperature: parseFloat(e.target.value) })
-                      }
-                      className="w-[180px]"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Top P</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={config.top_p}
+                    onChange={(e) =>
+                      setConfig({ ...config, top_p: parseFloat(e.target.value) })
+                    }
+                    className="w-[180px]"
+                  />
+                </div>
 
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block">Top P</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      value={config.top_p}
-                      onChange={(e) =>
-                        setConfig({ ...config, top_p: parseFloat(e.target.value) })
-                      }
-                      className="w-[180px]"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Presence Penalty</label>
+                  <Input
+                    type="number"
+                    min={-2}
+                    max={2}
+                    step={0.1}
+                    value={config.presence_penalty}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        presence_penalty: parseFloat(e.target.value)
+                      })
+                    }
+                    className="w-[180px]"
+                  />
+                </div>
 
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block">Presence Penalty</label>
-                    <Input
-                      type="number"
-                      min={-2}
-                      max={2}
-                      step={0.1}
-                      value={config.presence_penalty}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          presence_penalty: parseFloat(e.target.value)
-                        })
-                      }
-                      className="w-[180px]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block">Frequency Penalty</label>
-                    <Input
-                      type="number"
-                      min={-2}
-                      max={2}
-                      step={0.1}
-                      value={config.frequency_penalty}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          frequency_penalty: parseFloat(e.target.value)
-                        })
-                      }
-                      className="w-[180px]"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Frequency Penalty</label>
+                  <Input
+                    type="number"
+                    min={-2}
+                    max={2}
+                    step={0.1}
+                    value={config.frequency_penalty}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        frequency_penalty: parseFloat(e.target.value)
+                      })
+                    }
+                    className="w-[180px]"
+                  />
                 </div>
               </div>
             </div>
@@ -312,7 +397,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
             {chatMessages.map((message, index) => (
               <Card key={index} className="mb-4 p-4">
                 <div className="font-semibold mb-2">
-                  {message.role === 'user' ? 'Вы' : 'Ассистент'}:
+                  {message.role === 'user' ? 'Вы' : message.role === 'assistant' ? 'Ассистент' : 'Система'}:
                 </div>
                 <div className="whitespace-pre-wrap">{message.content}</div>
               </Card>

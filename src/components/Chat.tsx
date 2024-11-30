@@ -9,9 +9,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
+import { HumanMessage, AIMessage } from '@langchain/core/messages';
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: number;
 }
@@ -45,19 +46,21 @@ export default function Chat() {
       const stored = localStorage.getItem('experts');
       if (stored) {
         const experts = JSON.parse(stored);
-        // Устанавливаем первого эксперта по умолчанию если нет сохраненного
         const savedExpertId = localStorage.getItem('selected_expert_id');
         const expert = savedExpertId 
           ? experts.find((e: Expert) => e.id === savedExpertId)
           : experts[0];
           
         if (expert) {
-          setSelectedExpert(expert);
+          setSelectedExpert({
+            ...expert,
+            provider: expert.provider as 'openai' | 'google'
+          });
         }
       } else {
-        // Если в localStorage ничего нет, используем данные из файла
         const defaultExpertsWithCapabilities = defaultExperts.experts.map(expert => ({
           ...expert,
+          provider: expert.provider as 'openai' | 'google',
           capabilities: {
             webBrowsing: false,
             imageGeneration: false,
@@ -68,7 +71,11 @@ export default function Chat() {
       }
     } catch (error) {
       console.error('Error loading experts:', error);
-      setSelectedExpert(defaultExperts.experts[0]);
+      const firstExpert = {
+        ...defaultExperts.experts[0],
+        provider: defaultExperts.experts[0].provider as 'openai' | 'google'
+      };
+      setSelectedExpert(firstExpert);
     }
   }, []);
 
@@ -94,7 +101,8 @@ export default function Chat() {
         selectedExpert.temperature,
         selectedExpert.presence_penalty,
         selectedExpert.frequency_penalty,
-        selectedExpert.top_p
+        selectedExpert.top_p,
+        selectedExpert.provider
       );
     }
   }, [apiKey, selectedExpert]);
@@ -236,9 +244,13 @@ export default function Chat() {
       }
 
       // Generate response using LangChain
+      const messages = updatedChat.messages.map(msg => 
+        msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
+      );
+      
       const responseContent = await aiServiceRef.current.generateResponse(
         selectedExpert.systemPrompt,
-        updatedChat.messages
+        messages
       );
 
       const assistantMessage: Message = {
@@ -299,7 +311,10 @@ export default function Chat() {
           <ExpertSelector
             selectedExpertId={selectedExpert?.id || null}
             onSelect={(expert) => {
-              setSelectedExpert(expert);
+              setSelectedExpert({
+                ...expert,
+                provider: expert.provider as 'openai' | 'google'
+              });
               localStorage.setItem('selected_expert_id', expert.id);
               setCurrentChat(null);
             }}
@@ -452,7 +467,7 @@ export default function Chat() {
                 </button>
               </div>
             </div>
-          </>
+          </> 
         )}
       </div>
     </div>

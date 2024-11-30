@@ -1,27 +1,29 @@
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useState, useEffect } from 'react'
 import defaultExperts from '@/config/experts.json'
-
-interface Expert {
-  id: string
-  name: string
-  description: string
-  model: string
-  temperature: number
-  presence_penalty: number
-  frequency_penalty: number
-  top_p: number
-  systemPrompt: string
-  capabilities?: {
-    webBrowsing: boolean
-    imageGeneration: boolean
-    codeInterpreter: boolean
-  }
-}
+import { Expert } from '@/types/Expert'
 
 interface ExpertSelectorProps {
   onSelect: (expert: Expert) => void
   selectedExpertId: string | null
+}
+
+interface StoredExpert {
+  id: string;
+  name: string;
+  description: string;
+  model: string;
+  provider: string;
+  temperature: number;
+  presence_penalty: number;
+  frequency_penalty: number;
+  top_p: number;
+  systemPrompt: string;
+  capabilities?: {
+    webBrowsing: boolean;
+    imageGeneration: boolean;
+    codeInterpreter: boolean;
+  };
 }
 
 export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorProps) {
@@ -31,22 +33,41 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
     try {
       const stored = localStorage.getItem('experts')
       if (stored) {
-        setExperts(JSON.parse(stored))
+        const parsedExperts = JSON.parse(stored) as StoredExpert[];
+        const validatedExperts = parsedExperts.map((expert) => ({
+          ...expert,
+          provider: expert.provider as 'openai' | 'google',
+          capabilities: expert.capabilities || {
+            webBrowsing: false,
+            imageGeneration: false,
+            codeInterpreter: false
+          }
+        }));
+        setExperts(validatedExperts);
       } else {
-        // Если в localStorage ничего нет, используем данные из файла
         const defaultExpertsWithCapabilities = defaultExperts.experts.map(expert => ({
           ...expert,
+          provider: expert.provider as 'openai' | 'google',
           capabilities: {
             webBrowsing: false,
             imageGeneration: false,
             codeInterpreter: false
           }
-        }))
-        setExperts(defaultExpertsWithCapabilities)
+        }));
+        setExperts(defaultExpertsWithCapabilities);
       }
     } catch (error) {
-      console.error('Error loading experts:', error)
-      setExperts(defaultExperts.experts)
+      console.error('Error loading experts:', error);
+      const fallbackExperts = defaultExperts.experts.map(expert => ({
+        ...expert,
+        provider: expert.provider as 'openai' | 'google',
+        capabilities: {
+          webBrowsing: false,
+          imageGeneration: false,
+          codeInterpreter: false
+        }
+      }));
+      setExperts(fallbackExperts);
     }
   }, [])
 

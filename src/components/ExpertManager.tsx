@@ -6,33 +6,17 @@ import CreateAssistant from './CreateAssistant'
 import { Pencil, Trash2, Plus } from 'lucide-react'
 import defaultExperts from '@/config/experts.json'
 
-interface RawAssistantConfig {
-  id: string;
-  model: string;
-  temperature: number;
-  presence_penalty: number;
-  frequency_penalty: number;
-  top_p: number;
-  name: string;
-  description: string;
-  systemPrompt: string;
-  capabilities?: {
-    webBrowsing: boolean;
-    imageGeneration: boolean;
-    codeInterpreter: boolean;
-  };
-}
-
 interface AssistantConfig {
   id: string;
+  name: string;
+  description: string;
+  systemPrompt: string;
   model: string;
+  provider: 'openai' | 'google';
   temperature: number;
   presence_penalty: number;
   frequency_penalty: number;
   top_p: number;
-  name: string;
-  description: string;
-  systemPrompt: string;
   capabilities: {
     webBrowsing: boolean;
     imageGeneration: boolean;
@@ -42,37 +26,28 @@ interface AssistantConfig {
 
 export default function ExpertManager() {
   const [experts, setExperts] = useState<AssistantConfig[]>(() => {
-    try {
-      // Пытаемся получить экспертов из localStorage
-      const stored = localStorage.getItem('experts')
-      if (stored) {
-        const parsedExperts = JSON.parse(stored) as RawAssistantConfig[]
-        // Добавляем capabilities если их нет
-        return parsedExperts.map((expert) => ({
-          ...expert,
-          capabilities: expert.capabilities || {
-            webBrowsing: false,
-            imageGeneration: false,
-            codeInterpreter: false
-          }
-        }))
-      }
-      // Если в localStorage ничего нет, используем данные из файла
-      const defaultExpertsWithCapabilities = (defaultExperts.experts as RawAssistantConfig[]).map(expert => ({
+    const stored = localStorage.getItem('experts');
+    if (stored) {
+      const parsedExperts = JSON.parse(stored);
+      return parsedExperts.map((expert: AssistantConfig) => ({
         ...expert,
-        capabilities: {
+        provider: expert.provider || 'openai',
+        capabilities: expert.capabilities || {
           webBrowsing: false,
           imageGeneration: false,
           codeInterpreter: false
         }
-      }))
-      localStorage.setItem('experts', JSON.stringify(defaultExpertsWithCapabilities))
-      return defaultExpertsWithCapabilities
-    } catch (error) {
-      console.error('Error loading experts:', error)
-      toast.error('Ошибка при загрузке экспертов')
-      return []
+      }));
     }
+    return defaultExperts.experts.map(expert => ({
+      ...expert,
+      provider: expert.provider || 'openai',
+      capabilities: {
+        webBrowsing: false,
+        imageGeneration: false,
+        codeInterpreter: false
+      }
+    }));
   })
   const [selectedExpert, setSelectedExpert] = useState<AssistantConfig | undefined>(undefined)
   const [isCreateMode, setIsCreateMode] = useState(false)
@@ -135,6 +110,16 @@ export default function ExpertManager() {
                 <h3 className="text-lg font-semibold">{expert.name}</h3>
                 <p className="text-sm text-muted-foreground">{expert.description}</p>
                 <div className="mt-2 flex gap-2">
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    expert.provider === 'openai' 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {expert.provider === 'openai' ? 'OpenAI' : 'Google'}
+                  </span>
+                  <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                    {expert.model}
+                  </span>
                   {expert.capabilities?.webBrowsing && (
                     <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Web</span>
                   )}
