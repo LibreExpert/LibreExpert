@@ -371,10 +371,10 @@ export default function Chat() {
                 {currentChat?.messages.map((msg, index) => (
                   <div
                     key={index}
-                    className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
                   >
                     <div
-                      className={`p-4 rounded-lg relative max-w-[80%] ${
+                      className={`p-4 rounded-lg relative ${
                         msg.role === 'user'
                           ? 'bg-blue-100'
                           : 'bg-gray-100'
@@ -386,7 +386,6 @@ export default function Chat() {
                         className="prose prose-sm max-w-none dark:prose-invert"
                         components={{
                           pre: ({ children, ...props }) => {
-                            // Находим первый дочерний элемент code
                             const codeElement = React.Children.toArray(children).find(
                               (child): child is React.ReactElement => 
                                 React.isValidElement(child) && child.type === 'code'
@@ -422,7 +421,7 @@ export default function Chat() {
                               </code>
                             );
                           },
-                          p: ({ children }) => <p className="mb-4">{children}</p>,
+                          p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
                           a: ({ children, href }) => (
                             <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                               {children}
@@ -432,6 +431,11 @@ export default function Chat() {
                       >
                         {msg.content}
                       </ReactMarkdown>
+                      {msg.timestamp && (
+                        <div className="text-[10px] text-gray-400 mt-1 leading-none">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
