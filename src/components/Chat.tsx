@@ -82,15 +82,21 @@ export default function Chat() {
   // Load chats and API key from localStorage on component mount
   useEffect(() => {
     const savedChats = localStorage.getItem('chats');
-    const savedApiKey = localStorage.getItem('openai_api_key');
+    const savedOpenAIKey = localStorage.getItem('openai_api_key');
+    const savedGeminiKey = localStorage.getItem('gemini_api_key');
     
     if (savedChats) {
       setChats(JSON.parse(savedChats));
     }
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
+    
+    // Load appropriate API key based on selected expert's provider
+    if (selectedExpert) {
+      const key = selectedExpert.provider === 'openai' ? savedOpenAIKey : savedGeminiKey;
+      if (key) {
+        setApiKey(key);
+      }
     }
-  }, []);
+  }, [selectedExpert?.provider]);
 
   // Initialize AI service when API key or expert changes
   useEffect(() => {
@@ -287,15 +293,23 @@ export default function Chat() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="w-96 p-6 bg-white rounded-lg shadow-lg">
-          <h2 className="text-xl font-bold mb-4">Введите API ключ OpenAI</h2>
+          <h2 className="text-xl font-bold mb-4">
+            {selectedExpert?.provider === 'openai' ? 'Введите API ключ OpenAI' : 'Введите API ключ Google Gemini'}
+          </h2>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => {
-              setApiKey(e.target.value);
-              localStorage.setItem('openai_api_key', e.target.value);
+              const key = e.target.value;
+              setApiKey(key);
+              if (selectedExpert) {
+                localStorage.setItem(
+                  selectedExpert.provider === 'openai' ? 'openai_api_key' : 'gemini_api_key',
+                  key
+                );
+              }
             }}
-            placeholder="sk-..."
+            placeholder={selectedExpert?.provider === 'openai' ? "sk-..." : "AI..."}
             className="w-full p-2 border rounded mb-4"
           />
         </div>

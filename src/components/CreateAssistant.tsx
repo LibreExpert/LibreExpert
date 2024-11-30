@@ -60,7 +60,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openai_api_key') || '')
+  const [apiKey, setApiKey] = useState('')
   const [aiService, setAiService] = useState<AIService | null>(null)
   const [experts, setExperts] = useState<AssistantConfig[]>(() => {
     const stored = localStorage.getItem('experts')
@@ -69,8 +69,27 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
   const [testing, setTesting] = useState(false)
 
   useEffect(() => {
+    const savedOpenAIKey = localStorage.getItem('openai_api_key');
+    const savedGeminiKey = localStorage.getItem('gemini_api_key');
+    if (config.provider === 'openai' && savedOpenAIKey) {
+      setApiKey(savedOpenAIKey);
+    } else if (config.provider === 'google' && savedGeminiKey) {
+      setApiKey(savedGeminiKey);
+    }
+  }, [config.provider]);
+
+  const handleApiKeyChange = (value: string) => {
+    setApiKey(value);
+    if (config.provider === 'openai') {
+      localStorage.setItem('openai_api_key', value);
+    } else {
+      localStorage.setItem('gemini_api_key', value);
+    }
+  };
+
+  useEffect(() => {
     if (apiKey) {
-      localStorage.setItem('openai_api_key', apiKey)
+      localStorage.setItem(config.provider === 'openai' ? 'openai_api_key' : 'gemini_api_key', apiKey)
       setAiService(new AIService(
         apiKey,
         config.model,
@@ -232,12 +251,12 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         <div className="w-1/2 overflow-y-auto p-4">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
+              <label className="block text-sm font-medium mb-1">API ключ</label>
               <Input
                 type="password"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..."
+                onChange={(e) => handleApiKeyChange(e.target.value)}
+                placeholder={config.provider === 'openai' ? "sk-..." : "AI..."}
               />
             </div>
             <div>
@@ -281,13 +300,15 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
               <select
                 value={config.provider}
                 onChange={(e) => {
-                  const provider = e.target.value as 'openai' | 'google';
-                  setConfig({ 
-                    ...config, 
-                    provider,
-                    // Устанавливаем модель по умолчанию для выбранного провайдера
-                    model: provider === 'openai' ? 'gpt-4' : 'gemini-pro'
-                  })
+                  const newProvider = e.target.value as 'openai' | 'google';
+                  setConfig({ ...config, provider: newProvider });
+                  // Clear API key when switching providers
+                  setApiKey('');
+                  // Load the appropriate API key
+                  const savedKey = localStorage.getItem(newProvider === 'openai' ? 'openai_api_key' : 'gemini_api_key');
+                  if (savedKey) {
+                    setApiKey(savedKey);
+                  }
                 }}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
