@@ -4,7 +4,7 @@ import Settings from './pages/Settings'
 
 function App() {
   return (
-    <Router>
+    <Router basename="/LibreExpert">
       <div className="min-h-screen bg-background">
         <nav className="border-b p-4">
           <div className="container mx-auto flex justify-between items-center">
