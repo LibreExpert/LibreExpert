@@ -53,6 +53,21 @@ export async function PUT(
         frequencyPenalty: body.frequencyPenalty,
         topP: body.topP,
         capabilities: body.capabilities,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        systemPrompt: true,
+        model: true,
+        provider: true,
+        temperature: true,
+        presencePenalty: true,
+        frequencyPenalty: true,
+        topP: true,
+        capabilities: true,
+        createdAt: true,
+        updatedAt: true,
       }
     });
 

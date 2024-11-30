@@ -134,11 +134,14 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       const newExpert = { 
         ...config, 
         id: newExpertId,
-        api_key: apiKey // Include the API key when saving
+        api_key: apiKey
       }
       
-      const response = await fetch('/api/experts', {
-        method: initialConfig ? 'PUT' : 'POST',
+      const url = initialConfig ? `/api/experts/${newExpertId}` : '/api/experts'
+      const method = initialConfig ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
