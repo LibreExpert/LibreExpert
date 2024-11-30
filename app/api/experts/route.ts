@@ -24,6 +24,7 @@ export async function POST(request: Request) {
       systemPrompt: body.systemPrompt || '',
       model: body.model,
       provider: body.provider,
+      api_key: body.api_key,
       temperature: Number(body.temperature) || 0.7,
       presencePenalty: Number(body.presencePenalty) || 0,
       frequencyPenalty: Number(body.frequencyPenalty) || 0,

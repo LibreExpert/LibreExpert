@@ -17,6 +17,7 @@ model Expert {
   systemPrompt      String   @map("system_prompt")
   model             String
   provider          String
+  api_key           String?  @map("api_key")
   temperature       Float
   presencePenalty   Float    @map("presence_penalty")
   frequencyPenalty  Float    @map("frequency_penalty")

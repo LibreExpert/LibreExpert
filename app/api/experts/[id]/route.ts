@@ -47,6 +47,7 @@ export async function PUT(
         systemPrompt: body.systemPrompt,
         model: body.model,
         provider: body.provider,
+        api_key: body.api_key,
         temperature: body.temperature,
         presencePenalty: body.presencePenalty,
         frequencyPenalty: body.frequencyPenalty,

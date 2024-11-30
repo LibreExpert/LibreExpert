@@ -15,6 +15,7 @@ interface AssistantConfig {
   id: string;
   model: string;
   provider: 'openai' | 'google';
+  api_key?: string;
   temperature: number;
   presence_penalty: number;
   frequency_penalty: number;
@@ -54,6 +55,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       id: '',
       model: 'gpt-4',
       provider: 'openai',
+      api_key: '',
       temperature: 0.7,
       presence_penalty: 0.6,
       frequency_penalty: 0.5,
@@ -80,14 +82,20 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
   const [testing, setTesting] = useState(false)
 
   useEffect(() => {
-    const savedOpenAIKey = localStorage.getItem('openai_api_key');
-    const savedGeminiKey = localStorage.getItem('gemini_api_key');
-    if (config.provider === 'openai' && savedOpenAIKey) {
-      setApiKey(savedOpenAIKey);
-    } else if (config.provider === 'google' && savedGeminiKey) {
-      setApiKey(savedGeminiKey);
+    // First check if the expert has a stored API key
+    if (initialConfig?.api_key) {
+      setApiKey(initialConfig.api_key);
+    } else {
+      // Fall back to localStorage if no API key is stored with the expert
+      const savedOpenAIKey = localStorage.getItem('openai_api_key');
+      const savedGeminiKey = localStorage.getItem('gemini_api_key');
+      if (config.provider === 'openai' && savedOpenAIKey) {
+        setApiKey(savedOpenAIKey);
+      } else if (config.provider === 'google' && savedGeminiKey) {
+        setApiKey(savedGeminiKey);
+      }
     }
-  }, [config.provider]);
+  }, [config.provider, initialConfig]);
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -123,7 +131,11 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
 
     try {
       const newExpertId = initialConfig?.id || config.name.toLowerCase().replace(/\s+/g, '-')
-      const newExpert = { ...config, id: newExpertId }
+      const newExpert = { 
+        ...config, 
+        id: newExpertId,
+        api_key: apiKey // Include the API key when saving
+      }
       
       const response = await fetch('/api/experts', {
         method: initialConfig ? 'PUT' : 'POST',
@@ -144,6 +156,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
           id: '',
           model: 'gpt-4',
           provider: 'openai',
+          api_key: '',
           temperature: 0.7,
           presence_penalty: 0.6,
           frequency_penalty: 0.5,
