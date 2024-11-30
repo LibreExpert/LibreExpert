@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Expert } from '../types/Expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
-import experts from '../config/experts.json';
+import defaultExperts from '../config/experts.json';
 import { AIService } from '../services/ai.service';
+import { ExpertSelector } from './ExpertSelector';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -25,7 +26,7 @@ export default function Chat() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [apiKey, setApiKey] = useState('');
-  const [selectedExpert, setSelectedExpert] = useState<Expert>(experts.experts[0]);
+  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const aiServiceRef = useRef<AIService | null>(null);
@@ -33,23 +34,49 @@ export default function Chat() {
   // Constants
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+  // Load experts from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('experts');
+      if (stored) {
+        const experts = JSON.parse(stored);
+        // Устанавливаем первого эксперта по умолчанию если нет сохраненного
+        const savedExpertId = localStorage.getItem('selected_expert_id');
+        const expert = savedExpertId 
+          ? experts.find((e: Expert) => e.id === savedExpertId)
+          : experts[0];
+          
+        if (expert) {
+          setSelectedExpert(expert);
+        }
+      } else {
+        // Если в localStorage ничего нет, используем данные из файла
+        const defaultExpertsWithCapabilities = defaultExperts.experts.map(expert => ({
+          ...expert,
+          capabilities: {
+            webBrowsing: false,
+            imageGeneration: false,
+            codeInterpreter: false
+          }
+        }));
+        setSelectedExpert(defaultExpertsWithCapabilities[0]);
+      }
+    } catch (error) {
+      console.error('Error loading experts:', error);
+      setSelectedExpert(defaultExperts.experts[0]);
+    }
+  }, []);
+
   // Load chats and API key from localStorage on component mount
   useEffect(() => {
     const savedChats = localStorage.getItem('chats');
     const savedApiKey = localStorage.getItem('openai_api_key');
-    const savedExpertId = localStorage.getItem('selected_expert_id');
     
     if (savedChats) {
       setChats(JSON.parse(savedChats));
     }
     if (savedApiKey) {
       setApiKey(savedApiKey);
-    }
-    if (savedExpertId) {
-      const expert = experts.experts.find(e => e.id === savedExpertId);
-      if (expert) {
-        setSelectedExpert(expert);
-      }
     }
   }, []);
 
@@ -134,16 +161,6 @@ export default function Chat() {
       return updatedChats;
     });
     setCurrentChat(newChat);
-  };
-
-  // Handle expert selection
-  const handleExpertSelect = (expertId: string) => {
-    const expert = experts.experts.find(e => e.id === expertId);
-    if (expert) {
-      setSelectedExpert(expert);
-      localStorage.setItem('selected_expert_id', expert.id);
-      setCurrentChat(null);
-    }
   };
 
   // Handle problem resolution response
@@ -306,130 +323,122 @@ export default function Chat() {
 
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className="w-64 bg-gray-100 border-r border-gray-200 p-4">
-        {/* Expert Selector */}
+      {/* Left sidebar */}
+      <div className="w-64 border-r bg-gray-50 p-4 flex flex-col">
         <div className="mb-4">
-          <select
-            value={selectedExpert.id}
-            onChange={(e) => handleExpertSelect(e.target.value)}
-            className="w-full p-2 border rounded"
-          >
-            {experts.experts.map(expert => (
-              <option key={expert.id} value={expert.id}>
-                {expert.name}
-              </option>
-            ))}
-          </select>
+          <ExpertSelector
+            selectedExpertId={selectedExpert?.id || null}
+            onSelect={(expert) => {
+              setSelectedExpert(expert);
+              localStorage.setItem('selected_expert_id', expert.id);
+              setCurrentChat(null);
+            }}
+          />
         </div>
-
         <button
           onClick={createNewChat}
           className="w-full bg-blue-500 text-white rounded-lg px-4 py-2 mb-4 hover:bg-blue-600"
         >
           Новый чат
         </button>
-
-        <ScrollArea className="h-[calc(100vh-200px)]">
-          <div className="space-y-2">
-            {chats
-              .filter(chat => chat.expertId === selectedExpert.id)
-              .map(chat => (
-                <div
-                  key={chat.id}
-                  onClick={() => setCurrentChat(chat)}
-                  className={`p-2 rounded-lg cursor-pointer ${
-                    currentChat?.id === chat.id ? 'bg-blue-100' : 'hover:bg-gray-200'
-                  }`}
-                >
-                  <div className="text-sm font-medium truncate">{chat.title}</div>
-                  <div className="text-xs text-gray-500">
-                    {new Date(chat.createdAt).toLocaleDateString()}
-                  </div>
-                  {chat.problemResolved && (
-                    <div className="text-xs text-green-500">Решено ✓</div>
-                  )}
-                </div>
-              ))}
-          </div>
-        </ScrollArea>
+        <div className="flex-1 overflow-auto">
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                currentChat?.id === chat.id ? 'bg-blue-100' : ''
+              }`}
+              onClick={() => setCurrentChat(chat)}
+            >
+              <div className="font-medium truncate">{chat.title}</div>
+              <div className="text-sm text-gray-500">
+                {new Date(chat.createdAt).toLocaleString()}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Chat Area */}
+      {/* Main chat area */}
       <div className="flex-1 flex flex-col">
-        {/* Messages */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {currentChat?.messages.map((msg, index) => (
-              <div
-                key={index}
-                className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
-              >
-                <div
-                  className={`p-4 rounded-lg relative max-w-[80%] ${
-                    msg.role === 'user'
-                      ? 'bg-blue-100'
-                      : 'bg-gray-100'
-                  }`}
-                >
-                  <div className="mb-1">{msg.content}</div>
-                  <div className="text-xs text-gray-500 mt-1 text-right">
-                    {msg.timestamp 
-                      ? new Date(msg.timestamp).toLocaleTimeString([], { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })
-                      : ''}
-                  </div>
-                  {msg.role === 'assistant' && 
-                   msg.content.includes('Удалось ли решить вашу проблему?') && 
-                   !currentChat.problemResolved && (
-                    <div className="mt-2 flex space-x-2">
-                      <button
-                        onClick={() => handleProblemResolution(true)}
-                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                      >
-                        Да, решено
-                      </button>
-                      <button
-                        onClick={() => handleProblemResolution(false)}
-                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                      >
-                        Нет, нужна помощь
-                      </button>
+        {selectedExpert && (
+          <>
+            <div className="border-b p-4">
+              <h2 className="text-lg font-semibold">{selectedExpert.name}</h2>
+              <p className="text-sm text-gray-600">{selectedExpert.description}</p>
+            </div>
+            <ScrollArea className="flex-1 p-4">
+              <div className="space-y-4">
+                {currentChat?.messages.map((msg, index) => (
+                  <div
+                    key={index}
+                    className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
+                  >
+                    <div
+                      className={`p-4 rounded-lg relative max-w-[80%] ${
+                        msg.role === 'user'
+                          ? 'bg-blue-100'
+                          : 'bg-gray-100'
+                      }`}
+                    >
+                      <div className="mb-1">{msg.content}</div>
+                      <div className="text-xs text-gray-500 mt-1 text-right">
+                        {msg.timestamp 
+                          ? new Date(msg.timestamp).toLocaleTimeString([], { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })
+                          : ''}
+                      </div>
+                      {msg.role === 'assistant' && 
+                       msg.content.includes('Удалось ли решить вашу проблему?') && 
+                       !currentChat.problemResolved && (
+                        <div className="mt-2 flex space-x-2">
+                          <button
+                            onClick={() => handleProblemResolution(true)}
+                            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                          >
+                            Да, решено
+                          </button>
+                          <button
+                            onClick={() => handleProblemResolution(false)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                          >
+                            Нет, нужна помощь
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </ScrollArea>
-
-        {/* Input Area */}
-        <div className="border-t border-gray-200 p-4">
-          <div className="flex space-x-4">
-            <textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              placeholder="Введите сообщение..."
-              className="flex-1 resize-none border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={1}
-            />
-            <button
-              onClick={sendMessage}
-              className="bg-blue-500 text-white rounded-lg px-6 py-2 hover:bg-blue-600"
-            >
-              Отправить
-            </button>
-          </div>
-        </div>
+            </ScrollArea>
+            <div className="border-t border-gray-200 p-4">
+              <div className="flex space-x-4">
+                <textarea
+                  ref={textareaRef}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  placeholder="Введите сообщение..."
+                  className="flex-1 resize-none border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={1}
+                />
+                <button
+                  onClick={sendMessage}
+                  className="bg-blue-500 text-white rounded-lg px-6 py-2 hover:bg-blue-600"
+                >
+                  Отправить
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
