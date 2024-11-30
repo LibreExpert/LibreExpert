@@ -37,23 +37,26 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
+    
+    // Создаем объект только с теми полями, которые были переданы
+    const updateData: any = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.systemPrompt !== undefined) updateData.systemPrompt = body.systemPrompt;
+    if (body.model !== undefined) updateData.model = body.model;
+    if (body.provider !== undefined) updateData.provider = body.provider;
+    if (body.api_key !== undefined) updateData.api_key = body.api_key;
+    if (body.temperature !== undefined) updateData.temperature = body.temperature;
+    if (body.presencePenalty !== undefined) updateData.presencePenalty = body.presencePenalty;
+    if (body.frequencyPenalty !== undefined) updateData.frequencyPenalty = body.frequencyPenalty;
+    if (body.topP !== undefined) updateData.topP = body.topP;
+    if (body.capabilities !== undefined) updateData.capabilities = body.capabilities;
+
     const expert = await prisma.expert.update({
       where: {
         id: params.id
       },
-      data: {
-        name: body.name,
-        description: body.description,
-        systemPrompt: body.systemPrompt,
-        model: body.model,
-        provider: body.provider,
-        api_key: body.api_key,
-        temperature: body.temperature,
-        presencePenalty: body.presencePenalty,
-        frequencyPenalty: body.frequencyPenalty,
-        topP: body.topP,
-        capabilities: body.capabilities,
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,

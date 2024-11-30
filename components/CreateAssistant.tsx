@@ -134,7 +134,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       const newExpert = { 
         ...config, 
         id: newExpertId,
-        api_key: apiKey
+        ...(apiKey ? { api_key: apiKey } : {}) 
       }
       
       const url = initialConfig ? `/api/experts/${newExpertId}` : '/api/experts'
