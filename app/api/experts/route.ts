@@ -4,7 +4,23 @@ import { prisma } from '@/lib/prisma';
 // GET /api/experts
 export async function GET() {
   try {
-    const experts = await prisma.expert.findMany();
+    const experts = await prisma.expert.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        systemPrompt: true,
+        model: true,
+        provider: true,
+        temperature: true,
+        presencePenalty: true,
+        frequencyPenalty: true,
+        topP: true,
+        capabilities: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
     return NextResponse.json(experts);
   } catch (error) {
     console.error('Error fetching experts:', error);
@@ -39,7 +55,22 @@ export async function POST(request: Request) {
     console.log('Processed expert data:', expertData);
 
     const expert = await prisma.expert.create({
-      data: expertData
+      data: expertData,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        systemPrompt: true,
+        model: true,
+        provider: true,
+        temperature: true,
+        presencePenalty: true,
+        frequencyPenalty: true,
+        topP: true,
+        capabilities: true,
+        createdAt: true,
+        updatedAt: true,
+      }
     });
 
     console.log('Created expert:', expert);
