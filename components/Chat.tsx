@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Expert } from '@/types/expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import defaultExperts from '../config/experts.json';
-import { AIService } from '../services/ai.service';
+import { AIService } from '@/src/services/ai.service';
 import { ExpertSelector } from './ExpertSelector';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
