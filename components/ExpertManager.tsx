@@ -1,12 +1,12 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { Button } from '../components/ui/button'
-import { Card } from '../components/ui/card'
-import { toast } from 'sonner'
-import CreateAssistant from './CreateAssistant'
-import { Pencil, Trash2, Plus } from 'lucide-react'
-import defaultExperts from '@/config/experts.json'
+import React, { useState, useEffect } from 'react';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { toast } from 'sonner';
+import CreateAssistant from './CreateAssistant';
+import { Pencil, Trash2, Plus } from 'lucide-react';
+import defaultExperts from '@/config/experts.json';
 
 interface AssistantConfig {
   id: string;
@@ -27,63 +27,85 @@ interface AssistantConfig {
 }
 
 export default function ExpertManager() {
-  const [experts, setExperts] = useState<AssistantConfig[]>(() => {
+  const [experts, setExperts] = useState<AssistantConfig[]>([]);
+  const [selectedExpert, setSelectedExpert] = useState<AssistantConfig | undefined>(undefined);
+  const [isCreateMode, setIsCreateMode] = useState(false);
+
+  // Загрузка данных из localStorage после монтирования компонента
+  useEffect(() => {
     const stored = localStorage.getItem('experts');
     if (stored) {
       const parsedExperts = JSON.parse(stored);
-      return parsedExperts.map((expert: AssistantConfig) => ({
-        ...expert,
-        provider: expert.provider || 'openai',
-        capabilities: expert.capabilities || {
-          webBrowsing: false,
-          imageGeneration: false,
-          codeInterpreter: false
-        }
-      }));
+      setExperts(
+        parsedExperts.map((expert: any): AssistantConfig => ({
+          ...expert,
+          provider: expert.provider as 'openai' | 'google', // Явное приведение типа
+          capabilities: expert.capabilities || {
+            webBrowsing: false,
+            imageGeneration: false,
+            codeInterpreter: false,
+          },
+        }))
+      );
+    } else {
+      setExperts(
+        defaultExperts.experts.map((expert: any): AssistantConfig => ({
+          ...expert,
+          provider: expert.provider as 'openai' | 'google',
+          capabilities: expert.capabilities || {
+            webBrowsing: false,
+            imageGeneration: false,
+            codeInterpreter: false,
+          },
+        }))
+      );
     }
-    return defaultExperts.experts.map(expert => ({
-      ...expert,
-      provider: expert.provider || 'openai',
-      capabilities: {
-        webBrowsing: false,
-        imageGeneration: false,
-        codeInterpreter: false
-      }
-    }));
-  })
-  const [selectedExpert, setSelectedExpert] = useState<AssistantConfig | undefined>(undefined)
-  const [isCreateMode, setIsCreateMode] = useState(false)
+  }, []);
+  
 
   // Сохраняем изменения в localStorage при каждом обновлении экспертов
   useEffect(() => {
-    localStorage.setItem('experts', JSON.stringify(experts))
-  }, [experts])
+    if (experts.length > 0) {
+      localStorage.setItem('experts', JSON.stringify(experts));
+    }
+  }, [experts]);
 
   const handleDeleteExpert = (expertId: string) => {
-    const updatedExperts = experts.filter(expert => expert.id !== expertId)
-    setExperts(updatedExperts)
-    toast.success('Эксперт успешно удален')
-  }
+    const updatedExperts = experts.filter((expert) => expert.id !== expertId);
+    setExperts(updatedExperts);
+    toast.success('Эксперт успешно удален');
+  };
 
   const handleEditExpert = (expert: AssistantConfig) => {
-    setSelectedExpert(expert)
-    setIsCreateMode(true)
-  }
+    setSelectedExpert(expert);
+    setIsCreateMode(true);
+  };
 
   const handleCreateNewExpert = () => {
-    setSelectedExpert(undefined)
-    setIsCreateMode(true)
-  }
+    setSelectedExpert(undefined);
+    setIsCreateMode(true);
+  };
 
   const handleSaveComplete = () => {
-    setIsCreateMode(false)
-    setSelectedExpert(undefined)
+    setIsCreateMode(false);
+    setSelectedExpert(undefined);
     // Обновляем список экспертов из localStorage
-    const stored = localStorage.getItem('experts')
+    const stored = localStorage.getItem('experts');
     if (stored) {
-      setExperts(JSON.parse(stored))
+      const parsedExperts = JSON.parse(stored);
+      setExperts(
+        parsedExperts.map((expert: AssistantConfig) => ({
+          ...expert,
+          provider: expert.provider || 'openai',
+          capabilities: expert.capabilities || {
+            webBrowsing: false,
+            imageGeneration: false,
+            codeInterpreter: false,
+          },
+        }))
+      );
     }
-  }
+  };
 
   if (isCreateMode) {
     return (
@@ -91,7 +113,7 @@ export default function ExpertManager() {
         initialConfig={selectedExpert}
         onSave={handleSaveComplete}
       />
-    )
+    );
   }
 
   return (
@@ -103,7 +125,7 @@ export default function ExpertManager() {
           Создать нового эксперта
         </Button>
       </div>
-      
+
       <div className="space-y-4">
         {experts.map((expert) => (
           <Card key={expert.id} className="p-4">
@@ -112,24 +134,32 @@ export default function ExpertManager() {
                 <h3 className="text-lg font-semibold">{expert.name}</h3>
                 <p className="text-sm text-muted-foreground">{expert.description}</p>
                 <div className="mt-2 flex gap-2">
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    expert.provider === 'openai' 
-                      ? 'bg-blue-100 text-blue-800' 
-                      : 'bg-green-100 text-green-800'
-                  }`}>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      expert.provider === 'openai'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}
+                  >
                     {expert.provider === 'openai' ? 'OpenAI' : 'Google'}
                   </span>
                   <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
                     {expert.model}
                   </span>
                   {expert.capabilities?.webBrowsing && (
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Web</span>
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      Web
+                    </span>
                   )}
                   {expert.capabilities?.imageGeneration && (
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Image</span>
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                      Image
+                    </span>
                   )}
                   {expert.capabilities?.codeInterpreter && (
-                    <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Code</span>
+                    <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                      Code
+                    </span>
                   )}
                 </div>
               </div>
@@ -154,5 +184,5 @@ export default function ExpertManager() {
         ))}
       </div>
     </div>
-  )
+  );
 }
