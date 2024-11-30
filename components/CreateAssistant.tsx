@@ -252,14 +252,6 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         >
           Сохранить
         </Button>
-        <Button
-          variant="default"
-          onClick={testConnection}
-          disabled={testing}
-          className="px-4"
-        >
-          {testing ? 'Тестирую...' : 'Тестировать'}
-        </Button>
       </header>
 
       <div className="flex gap-4 h-[calc(100vh-64px)]">
