@@ -31,22 +31,32 @@ interface ChatMessage {
   content: string
 }
 
-export default function CreateAssistant() {
-  const [config, setConfig] = useState<AssistantConfig>({
-    id: '',
-    model: 'gpt-4o-mini',
-    temperature: 0.7,
-    presence_penalty: 0.6,
-    frequency_penalty: 0.5,
-    top_p: 0.9,
-    name: '',
-    description: '',
-    systemPrompt: '',
-    capabilities: {
-      webBrowsing: false,
-      imageGeneration: false,
-      codeInterpreter: false
+interface Props {
+  initialConfig?: AssistantConfig;
+  onSave?: () => void;
+}
+
+export default function CreateAssistant({ initialConfig, onSave }: Props) {
+  const [config, setConfig] = useState<AssistantConfig>(() => {
+    if (initialConfig) {
+      return initialConfig;
     }
+    return {
+      id: '',
+      model: 'gpt-4o-mini',
+      temperature: 0.7,
+      presence_penalty: 0.6,
+      frequency_penalty: 0.5,
+      top_p: 0.9,
+      name: '',
+      description: '',
+      systemPrompt: '',
+      capabilities: {
+        webBrowsing: false,
+        imageGeneration: false,
+        codeInterpreter: false
+      }
+    };
   })
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -100,15 +110,13 @@ export default function CreateAssistant() {
     }
 
     try {
-      const newExpertId = config.name.toLowerCase().replace(/\s+/g, '-')
+      const newExpertId = initialConfig?.id || config.name.toLowerCase().replace(/\s+/g, '-')
       const newExpert = { ...config, id: newExpertId }
       
-      if (experts.some(expert => expert.id === newExpertId)) {
-        toast.error('Эксперт с таким названием уже существует')
-        return
-      }
+      const updatedExperts = initialConfig 
+        ? experts.map(e => e.id === initialConfig.id ? newExpert : e)
+        : [...experts, newExpert]
 
-      const updatedExperts = [...experts, newExpert]
       setExperts(updatedExperts)
 
       await fetch('/api/saveExperts', {
@@ -119,25 +127,29 @@ export default function CreateAssistant() {
         body: JSON.stringify({ experts: updatedExperts })
       })
 
-      toast.success('Эксперт успешно создан')
+      toast.success(initialConfig ? 'Эксперт успешно обновлен' : 'Эксперт успешно создан')
       
-      setConfig({
-        id: '',
-        model: 'gpt-4o-mini',
-        temperature: 0.7,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.5,
-        top_p: 0.9,
-        name: '',
-        description: '',
-        systemPrompt: '',
-        capabilities: {
-          webBrowsing: false,
-          imageGeneration: false,
-          codeInterpreter: false
-        }
-      })
+      if (!initialConfig) {
+        setConfig({
+          id: '',
+          model: 'gpt-4o-mini',
+          temperature: 0.7,
+          presence_penalty: 0.6,
+          frequency_penalty: 0.5,
+          top_p: 0.9,
+          name: '',
+          description: '',
+          systemPrompt: '',
+          capabilities: {
+            webBrowsing: false,
+            imageGeneration: false,
+            codeInterpreter: false
+          }
+        })
+      }
+      
       setChatMessages([])
+      onSave?.()
     } catch (error) {
       console.error('Error saving expert:', error)
       toast.error('Ошибка при сохранении эксперта')
@@ -193,7 +205,7 @@ export default function CreateAssistant() {
                     onClick={handleSaveExpert}
                     disabled={!config.name}
                   >
-                    Сохранить эксперта
+                    {initialConfig ? 'Обновить эксперта' : 'Сохранить эксперта'}
                   </Button>
                 )}
               </div>
@@ -202,7 +214,7 @@ export default function CreateAssistant() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold">
-                  {isTestMode ? 'Тестирование эксперта' : 'Создание нового эксперта'}
+                  {isTestMode ? 'Тестирование эксперта' : initialConfig ? 'Редактирование эксперта' : 'Создание нового эксперта'}
                 </h2>
                 <Button
                   variant="outline"

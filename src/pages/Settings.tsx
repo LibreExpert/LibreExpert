@@ -1,5 +1,9 @@
-import CreateAssistant from '@/components/CreateAssistant'
+import ExpertManager from '@/components/ExpertManager'
 
 export default function Settings() {
-  return <CreateAssistant />
+  return (
+    <div className="container mx-auto py-8">
+      <ExpertManager />
+    </div>
+  )
 }
