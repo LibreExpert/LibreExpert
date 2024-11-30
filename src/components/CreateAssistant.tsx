@@ -255,81 +255,83 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
               />
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Модель</label>
-                <Input
-                  value={config.model}
-                  onChange={(e) => setConfig({ ...config, model: e.target.value })}
-                  className="max-w-[200px]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium mb-1">Temperature</label>
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Модель</label>
                   <Input
-                    type="number"
-                    min={0}
-                    max={2}
-                    step={0.1}
-                    value={config.temperature}
-                    onChange={(e) =>
-                      setConfig({ ...config, temperature: parseFloat(e.target.value) })
-                    }
-                    className="w-24"
+                    value={config.model}
+                    onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                    className="w-[180px]"
                   />
                 </div>
 
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium mb-1">Top P</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={config.top_p}
-                    onChange={(e) =>
-                      setConfig({ ...config, top_p: parseFloat(e.target.value) })
-                    }
-                    className="w-24"
-                  />
-                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Temperature</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      value={config.temperature}
+                      onChange={(e) =>
+                        setConfig({ ...config, temperature: parseFloat(e.target.value) })
+                      }
+                      className="w-[180px]"
+                    />
+                  </div>
 
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium mb-1">Presence Penalty</label>
-                  <Input
-                    type="number"
-                    min={-2}
-                    max={2}
-                    step={0.1}
-                    value={config.presence_penalty}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        presence_penalty: parseFloat(e.target.value)
-                      })
-                    }
-                    className="w-24"
-                  />
-                </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Top P</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      value={config.top_p}
+                      onChange={(e) =>
+                        setConfig({ ...config, top_p: parseFloat(e.target.value) })
+                      }
+                      className="w-[180px]"
+                    />
+                  </div>
 
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium mb-1">Frequency Penalty</label>
-                  <Input
-                    type="number"
-                    min={-2}
-                    max={2}
-                    step={0.1}
-                    value={config.frequency_penalty}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        frequency_penalty: parseFloat(e.target.value)
-                      })
-                    }
-                    className="w-24"
-                  />
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Presence Penalty</label>
+                    <Input
+                      type="number"
+                      min={-2}
+                      max={2}
+                      step={0.1}
+                      value={config.presence_penalty}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          presence_penalty: parseFloat(e.target.value)
+                        })
+                      }
+                      className="w-[180px]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Frequency Penalty</label>
+                    <Input
+                      type="number"
+                      min={-2}
+                      max={2}
+                      step={0.1}
+                      value={config.frequency_penalty}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          frequency_penalty: parseFloat(e.target.value)
+                        })
+                      }
+                      className="w-[180px]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
