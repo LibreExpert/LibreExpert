@@ -1,5 +1,7 @@
 // layout.tsx
 
+import './globals.css'
+
 export const metadata = {
   title: 'My Next JS App',
   description: 
@@ -13,8 +15,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        <div className="relative flex min-h-screen flex-col">
           {children}
+        </div>
       </body>
     </html>
   )
