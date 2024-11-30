@@ -6,7 +6,6 @@ import { Card } from '../components/ui/card';
 import { toast } from 'sonner';
 import CreateAssistant from './CreateAssistant';
 import { Pencil, Trash2, Plus } from 'lucide-react';
-import defaultExperts from '@/config/experts.json';
 
 interface Expert {
   id: string;
