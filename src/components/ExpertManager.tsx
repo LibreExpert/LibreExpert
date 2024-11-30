@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Button } from "./ui/button"
-import { Card } from "./ui/card"
-import { ScrollArea } from "./ui/scroll-area"
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
 import CreateAssistant from './CreateAssistant'
 import { Pencil, Trash2, Plus } from 'lucide-react'
+import defaultExperts from '@/config/experts.json'
 
-interface RawExpertData {
+interface RawAssistantConfig {
   id: string;
   model: string;
   temperature: number;
@@ -21,10 +21,6 @@ interface RawExpertData {
     imageGeneration: boolean;
     codeInterpreter: boolean;
   };
-}
-
-interface ExpertsResponse {
-  experts: RawExpertData[];
 }
 
 interface AssistantConfig {
@@ -45,47 +41,14 @@ interface AssistantConfig {
 }
 
 export default function ExpertManager() {
-  const [experts, setExperts] = useState<AssistantConfig[]>([])
-  const [selectedExpert, setSelectedExpert] = useState<AssistantConfig | undefined>(undefined)
-  const [isCreating, setIsCreating] = useState(false)
-
-  useEffect(() => {
-    loadExperts()
-  }, [])
-
-  const loadExperts = async () => {
+  const [experts, setExperts] = useState<AssistantConfig[]>(() => {
     try {
-      // First try to load from the API
-      let response = await fetch('/api/experts')
-      
-      if (!response.ok) {
-        // If API fails, try to load from the static file
-        response = await fetch('/LibreExpert/config/experts.json')
-      }
-      
-      if (!response.ok) {
-        throw new Error('Failed to load experts')
-      }
-      
-      const data = await response.json() as ExpertsResponse
-      // Add default capabilities if missing
-      const expertsWithCapabilities = (data.experts || []).map((expert: RawExpertData) => ({
-        ...expert,
-        capabilities: expert.capabilities || {
-          webBrowsing: false,
-          imageGeneration: false,
-          codeInterpreter: false
-        }
-      }))
-      setExperts(expertsWithCapabilities)
-    } catch (error) {
-      console.error('Error loading experts:', error)
-      toast.error('Не удалось загрузить экспертов')
-      
-      // Try to load local file as fallback
-      try {
-        const data = await import('@/config/experts.json') as { default: ExpertsResponse }
-        const expertsWithCapabilities = (data.default.experts || []).map((expert: RawExpertData) => ({
+      // Пытаемся получить экспертов из localStorage
+      const stored = localStorage.getItem('experts')
+      if (stored) {
+        const parsedExperts = JSON.parse(stored) as RawAssistantConfig[]
+        // Добавляем capabilities если их нет
+        return parsedExperts.map((expert) => ({
           ...expert,
           capabilities: expert.capabilities || {
             webBrowsing: false,
@@ -93,77 +56,64 @@ export default function ExpertManager() {
             codeInterpreter: false
           }
         }))
-        setExperts(expertsWithCapabilities)
-      } catch (localError) {
-        console.error('Error loading local experts:', localError)
       }
-    }
-  }
-
-  const handleDeleteExpert = async (expertId: string) => {
-    try {
-      const updatedExperts = experts.filter(expert => expert.id !== expertId)
-      await fetch('/api/saveExperts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ experts: updatedExperts })
-      })
-      setExperts(updatedExperts)
-      toast.success('Эксперт успешно удален')
+      // Если в localStorage ничего нет, используем данные из файла
+      const defaultExpertsWithCapabilities = (defaultExperts.experts as RawAssistantConfig[]).map(expert => ({
+        ...expert,
+        capabilities: {
+          webBrowsing: false,
+          imageGeneration: false,
+          codeInterpreter: false
+        }
+      }))
+      localStorage.setItem('experts', JSON.stringify(defaultExpertsWithCapabilities))
+      return defaultExpertsWithCapabilities
     } catch (error) {
-      console.error('Error deleting expert:', error)
-      toast.error('Ошибка при удалении эксперта')
+      console.error('Error loading experts:', error)
+      toast.error('Ошибка при загрузке экспертов')
+      return []
     }
+  })
+  const [selectedExpert, setSelectedExpert] = useState<AssistantConfig | undefined>(undefined)
+  const [isCreateMode, setIsCreateMode] = useState(false)
+
+  // Сохраняем изменения в localStorage при каждом обновлении экспертов
+  useEffect(() => {
+    localStorage.setItem('experts', JSON.stringify(experts))
+  }, [experts])
+
+  const handleDeleteExpert = (expertId: string) => {
+    const updatedExperts = experts.filter(expert => expert.id !== expertId)
+    setExperts(updatedExperts)
+    toast.success('Эксперт успешно удален')
   }
 
   const handleEditExpert = (expert: AssistantConfig) => {
     setSelectedExpert(expert)
-    setIsCreating(true)
+    setIsCreateMode(true)
   }
 
-  if (isCreating) {
+  const handleCreateNewExpert = () => {
+    setSelectedExpert(undefined)
+    setIsCreateMode(true)
+  }
+
+  const handleSaveComplete = () => {
+    setIsCreateMode(false)
+    setSelectedExpert(undefined)
+    // Обновляем список экспертов из localStorage
+    const stored = localStorage.getItem('experts')
+    if (stored) {
+      setExperts(JSON.parse(stored))
+    }
+  }
+
+  if (isCreateMode) {
     return (
-      <div className="relative">
-        <div className="absolute top-0 left-0 z-10 m-4">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => {
-              setIsCreating(false)
-              setSelectedExpert(undefined)
-            }}
-            className="hover:bg-accent"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-6 h-6"
-            >
-              <path d="m12 19-7-7 7-7"/>
-              <path d="M19 12H5"/>
-            </svg>
-          </Button>
-        </div>
-        <div>
-          <CreateAssistant 
-            initialConfig={selectedExpert}
-            onSave={() => {
-              setIsCreating(false)
-              setSelectedExpert(undefined)
-              loadExperts()
-            }}
-          />
-        </div>
-      </div>
+      <CreateAssistant
+        initialConfig={selectedExpert}
+        onSave={handleSaveComplete}
+      />
     )
   }
 
@@ -171,53 +121,51 @@ export default function ExpertManager() {
     <div className="py-8 space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Управление экспертами</h2>
-        <Button onClick={() => setIsCreating(true)}>
+        <Button onClick={handleCreateNewExpert}>
           <Plus className="mr-2 h-4 w-4" />
           Создать нового эксперта
         </Button>
       </div>
       
-      <ScrollArea className="h-[600px]">
-        <div className="space-y-4">
-          {experts.map((expert) => (
-            <Card key={expert.id} className="p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold">{expert.name}</h3>
-                  <p className="text-sm text-muted-foreground">{expert.description}</p>
-                  <div className="mt-2 flex gap-2">
-                    {expert.capabilities.webBrowsing && (
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Web</span>
-                    )}
-                    {expert.capabilities.imageGeneration && (
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Image</span>
-                    )}
-                    {expert.capabilities.codeInterpreter && (
-                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Code</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleEditExpert(expert)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDeleteExpert(expert.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+      <div className="space-y-4">
+        {experts.map((expert) => (
+          <Card key={expert.id} className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-semibold">{expert.name}</h3>
+                <p className="text-sm text-muted-foreground">{expert.description}</p>
+                <div className="mt-2 flex gap-2">
+                  {expert.capabilities?.webBrowsing && (
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Web</span>
+                  )}
+                  {expert.capabilities?.imageGeneration && (
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Image</span>
+                  )}
+                  {expert.capabilities?.codeInterpreter && (
+                    <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Code</span>
+                  )}
                 </div>
               </div>
-            </Card>
-          ))}
-        </div>
-      </ScrollArea>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleEditExpert(expert)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleDeleteExpert(expert.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }

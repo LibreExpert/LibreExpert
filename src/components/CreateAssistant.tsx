@@ -36,11 +36,8 @@ interface Props {
 }
 
 export default function CreateAssistant({ initialConfig, onSave }: Props) {
-  const [config, setConfig] = useState<AssistantConfig>(() => {
-    if (initialConfig) {
-      return initialConfig;
-    }
-    return {
+  const [config, setConfig] = useState<AssistantConfig>(
+    initialConfig || {
       id: '',
       model: 'gpt-4o-mini',
       temperature: 0.7,
@@ -55,50 +52,31 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         imageGeneration: false,
         codeInterpreter: false
       }
-    };
-  })
+    }
+  )
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
-  const [apiKey, setApiKey] = useState(() => {
-    // Пытаемся получить ключ из localStorage при инициализации
-    return localStorage.getItem('openai_api_key') || ''
-  })
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openai_api_key') || '')
   const [aiService, setAiService] = useState<AIService | null>(null)
-  const [experts, setExperts] = useState<AssistantConfig[]>([])
-  const [isTestMode] = useState(true)
-
-  useEffect(() => {
-    const loadExperts = async () => {
-      try {
-        const response = await fetch('/config/experts.json')
-        const data = await response.json()
-        setExperts(data.experts || [])
-      } catch (error) {
-        console.error('Error loading experts:', error)
-        toast.error('Не удалось загрузить экспертов')
-      }
-    }
-    loadExperts()
-  }, [])
+  const [experts, setExperts] = useState<AssistantConfig[]>(() => {
+    const stored = localStorage.getItem('experts')
+    return stored ? JSON.parse(stored) : []
+  })
 
   useEffect(() => {
     if (apiKey) {
       localStorage.setItem('openai_api_key', apiKey)
-    }
-  }, [apiKey])
-
-  useEffect(() => {
-    if (apiKey && config) {
-      const service = new AIService(
+      setAiService(new AIService(
         apiKey,
         config.model,
         config.temperature,
         config.presence_penalty,
         config.frequency_penalty,
         config.top_p
-      )
-      setAiService(service)
+      ))
+    } else {
+      setAiService(null)
     }
   }, [apiKey, config])
 
@@ -117,14 +95,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         : [...experts, newExpert]
 
       setExperts(updatedExperts)
-
-      await fetch('/api/saveExperts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ experts: updatedExperts })
-      })
+      localStorage.setItem('experts', JSON.stringify(updatedExperts))
 
       toast.success(initialConfig ? 'Эксперт успешно обновлен' : 'Эксперт успешно создан')
       
@@ -155,21 +126,21 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
     }
   }
 
-  const handleSendMessage = async () => {
+  async function handleSendMessage() {
     if (!inputMessage.trim() || !aiService) return
 
-    const userMessage: ChatMessage = {
+    const newMessage: ChatMessage = {
       role: 'user',
-      content: inputMessage.trim()
+      content: inputMessage
     }
-    
-    setChatMessages(prev => [...prev, userMessage])
+
+    setChatMessages(prev => [...prev, newMessage])
     setInputMessage('')
 
     try {
       const systemPrompt = config.systemPrompt || 'You are a helpful AI assistant.'
-      const response = await aiService.generateResponse(systemPrompt, [...chatMessages, userMessage])
-
+      const response = await aiService.generateResponse(systemPrompt, [...chatMessages, newMessage])
+      
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: response
@@ -194,18 +165,15 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
           <ArrowLeft className="h-6 w-6" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold">
-            {isTestMode ? 'Тестирование эксперта' : initialConfig ? 'Редактирование эксперта' : 'Создание нового эксперта'}
-          </h1>
+          <h1 className="text-lg font-semibold">Тестирование эксперта</h1>
         </div>
-        {!isTestMode && (
-          <Button
-            onClick={handleSaveExpert}
-            disabled={!config.name}
-          >
-            {initialConfig ? 'Обновить эксперта' : 'Сохранить эксперта'}
-          </Button>
-        )}
+        <Button
+          variant="default"
+          onClick={handleSaveExpert}
+          className="px-4"
+        >
+          Сохранить
+        </Button>
       </header>
 
       <div className="flex gap-4 h-[calc(100vh-64px)]">
