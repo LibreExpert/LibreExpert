@@ -432,7 +432,7 @@ export default function Chat() {
                         {msg.content}
                       </ReactMarkdown>
                       {msg.timestamp && (
-                        <div className="text-[10px] text-gray-400 mt-1 leading-none">
+                        <div className={`text-[10px] text-gray-400 mt-1 leading-none ${msg.role === 'assistant' ? 'text-right' : ''}`}>
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       )}
