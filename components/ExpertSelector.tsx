@@ -3,7 +3,7 @@
 import { ScrollArea } from "../components/ui/scroll-area"
 import { useState, useEffect } from 'react'
 import defaultExperts from '@/config/experts.json'
-import { Expert } from '@/types/Expert'
+import { Expert } from '@/types/expert'
 
 interface ExpertSelectorProps {
   onSelect: (expert: Expert) => void

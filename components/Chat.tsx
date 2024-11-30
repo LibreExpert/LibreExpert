@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { Expert } from '../types/Expert';
+import { Expert } from '@/types/expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import defaultExperts from '../config/experts.json';
 import { AIService } from '../services/ai.service';
