@@ -3,9 +3,8 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Textarea } from "./ui/textarea"
 import { ScrollArea } from "./ui/scroll-area"
-import { Checkbox } from "./ui/checkbox"
 import { Card } from "./ui/card"
-import { Zap, Send } from 'lucide-react'
+import { Send, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { AIService } from '@/services/ai.service'
 
@@ -67,7 +66,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
   })
   const [aiService, setAiService] = useState<AIService | null>(null)
   const [experts, setExperts] = useState<AssistantConfig[]>([])
-  const [isTestMode, setIsTestMode] = useState(true)
+  const [isTestMode] = useState(true)
 
   useEffect(() => {
     const loadExperts = async () => {
@@ -184,260 +183,188 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <div className="w-1/2 border-r">
-        <ScrollArea className="h-full px-6 py-4">
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center">
-                <Zap className="w-10 h-10 text-white" />
-              </div>
-              <div className="space-x-2">
-                <Input 
-                  placeholder="Введите API ключ OpenAI"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  type="password"
-                  className="w-64"
-                />
-                {!isTestMode && (
-                  <Button 
-                    onClick={handleSaveExpert}
-                    disabled={!config.name}
-                  >
-                    {initialConfig ? 'Обновить эксперта' : 'Сохранить эксперта'}
-                  </Button>
-                )}
-              </div>
+    <div className="flex flex-col h-screen">
+      <header className="flex items-center gap-4 p-4 border-b">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onSave?.()}
+          className="hover:bg-accent"
+        >
+          <ArrowLeft className="h-6 w-6" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-lg font-semibold">
+            {isTestMode ? 'Тестирование эксперта' : initialConfig ? 'Редактирование эксперта' : 'Создание нового эксперта'}
+          </h1>
+        </div>
+        {!isTestMode && (
+          <Button
+            onClick={handleSaveExpert}
+            disabled={!config.name}
+          >
+            {initialConfig ? 'Обновить эксперта' : 'Сохранить эксперта'}
+          </Button>
+        )}
+      </header>
+
+      <div className="flex gap-4 h-[calc(100vh-64px)]">
+        {/* Left side - Creation mode */}
+        <div className="w-1/2 overflow-y-auto p-4">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
+              <Input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-..."
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Название эксперта
+              </label>
+              <Input
+                value={config.name}
+                onChange={(e) => setConfig({ ...config, name: e.target.value })}
+                placeholder="Введите название"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Описание
+              </label>
+              <Textarea
+                value={config.description}
+                onChange={(e) => setConfig({ ...config, description: e.target.value })}
+                placeholder="Введите описание"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Системный промпт
+              </label>
+              <Textarea
+                value={config.systemPrompt}
+                onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
+                placeholder="Введите системный промпт"
+                className="min-h-[200px]"
+              />
             </div>
 
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold">
-                  {isTestMode ? 'Тестирование эксперта' : initialConfig ? 'Редактирование эксперта' : 'Создание нового эксперта'}
-                </h2>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsTestMode(!isTestMode)}
-                >
-                  {isTestMode ? 'Режим создания' : 'Режим тестирования'}
-                </Button>
-              </div>
-
               <div>
-                <label className="text-sm font-medium mb-1 block">
-                  Название эксперта
-                </label>
-                <Input
-                  value={config.name}
-                  onChange={(e) => setConfig({ ...config, name: e.target.value })}
-                  placeholder="Введите название"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">
-                  Описание
-                </label>
-                <Textarea
-                  value={config.description}
-                  onChange={(e) => setConfig({ ...config, description: e.target.value })}
-                  placeholder="Введите описание"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">
-                  Системный промпт
-                </label>
-                <Textarea
-                  value={config.systemPrompt}
-                  onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
-                  placeholder="Введите системный промпт"
-                  className="min-h-[200px]"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">
-                  Модель
-                </label>
+                <label className="text-sm font-medium mb-1.5 block">Модель</label>
                 <Input
                   value={config.model}
                   onChange={(e) => setConfig({ ...config, model: e.target.value })}
-                  placeholder="Введите название модели"
+                  className="max-w-[200px]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    Temperature
-                  </label>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium mb-1">Temperature</label>
                   <Input
                     type="number"
-                    min="0"
-                    max="1"
-                    step="0.1"
+                    min={0}
+                    max={2}
+                    step={0.1}
                     value={config.temperature}
-                    onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setConfig({ ...config, temperature: parseFloat(e.target.value) })
+                    }
+                    className="w-24"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    Top P
-                  </label>
+
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium mb-1">Top P</label>
                   <Input
                     type="number"
-                    min="0"
-                    max="1"
-                    step="0.1"
+                    min={0}
+                    max={1}
+                    step={0.1}
                     value={config.top_p}
-                    onChange={(e) => setConfig({ ...config, top_p: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setConfig({ ...config, top_p: parseFloat(e.target.value) })
+                    }
+                    className="w-24"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    Presence Penalty
-                  </label>
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium mb-1">Presence Penalty</label>
                   <Input
                     type="number"
-                    min="0"
-                    max="1"
-                    step="0.1"
+                    min={-2}
+                    max={2}
+                    step={0.1}
                     value={config.presence_penalty}
-                    onChange={(e) => setConfig({ ...config, presence_penalty: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        presence_penalty: parseFloat(e.target.value)
+                      })
+                    }
+                    className="w-24"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    Frequency Penalty
-                  </label>
+
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium mb-1">Frequency Penalty</label>
                   <Input
                     type="number"
-                    min="0"
-                    max="1"
-                    step="0.1"
+                    min={-2}
+                    max={2}
+                    step={0.1}
                     value={config.frequency_penalty}
-                    onChange={(e) => setConfig({ ...config, frequency_penalty: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        frequency_penalty: parseFloat(e.target.value)
+                      })
+                    }
+                    className="w-24"
                   />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium block">
-                  Возможности
-                </label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={config.capabilities.webBrowsing}
-                      onCheckedChange={(checked) =>
-                        setConfig({
-                          ...config,
-                          capabilities: {
-                            ...config.capabilities,
-                            webBrowsing: checked as boolean
-                          }
-                        })
-                      }
-                    />
-                    <label>Web Browsing</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={config.capabilities.imageGeneration}
-                      onCheckedChange={(checked) =>
-                        setConfig({
-                          ...config,
-                          capabilities: {
-                            ...config.capabilities,
-                            imageGeneration: checked as boolean
-                          }
-                        })
-                      }
-                    />
-                    <label>Image Generation</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={config.capabilities.codeInterpreter}
-                      onCheckedChange={(checked) =>
-                        setConfig({
-                          ...config,
-                          capabilities: {
-                            ...config.capabilities,
-                            codeInterpreter: checked as boolean
-                          }
-                        })
-                      }
-                    />
-                    <label>Code Interpreter</label>
-                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </ScrollArea>
-      </div>
-
-      <div className="w-1/2 bg-zinc-900 flex flex-col">
-        <div className="p-4 border-b border-zinc-800">
-          <h2 className="text-lg font-semibold text-white">
-            Предварительный просмотр: {config.name || 'Новый эксперт'}
-          </h2>
         </div>
 
-        <Card className="flex-1 bg-zinc-800 border-zinc-700 flex flex-col">
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
-              {chatMessages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    message.role === 'user' ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  <div
-                    className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                      message.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-zinc-700 text-zinc-100'
-                    }`}
-                  >
-                    {message.content}
-                  </div>
+        {/* Right side - Test mode */}
+        <div className="w-1/2 p-4">
+          <ScrollArea className="h-[calc(100vh-140px)] rounded-md border p-4">
+            {chatMessages.map((message, index) => (
+              <Card key={index} className="mb-4 p-4">
+                <div className="font-semibold mb-2">
+                  {message.role === 'user' ? 'Вы' : 'Ассистент'}:
                 </div>
-              ))}
-            </div>
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              </Card>
+            ))}
           </ScrollArea>
-
-          <div className="p-4 border-t border-zinc-700">
-            <div className="flex gap-2">
-              <Input
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Введите сообщение..."
-                className="flex-1 bg-zinc-700 border-zinc-600 text-white"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSendMessage()
-                  }
-                }}
-              />
-              <Button 
-                onClick={handleSendMessage} 
-                disabled={!apiKey || !aiService}
-                size="icon"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+          <div className="mt-4 flex gap-2">
+            <Input
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder="Введите сообщение..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSendMessage()
+                }
+              }}
+            />
+            <Button onClick={handleSendMessage} disabled={!inputMessage.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   )

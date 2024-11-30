@@ -2,7 +2,7 @@ import ExpertManager from '@/components/ExpertManager'
 
 export default function Settings() {
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto">
       <ExpertManager />
     </div>
   )

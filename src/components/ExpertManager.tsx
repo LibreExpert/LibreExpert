@@ -125,30 +125,50 @@ export default function ExpertManager() {
 
   if (isCreating) {
     return (
-      <div className="space-y-4">
-        <Button 
-          variant="outline" 
-          onClick={() => {
-            setIsCreating(false)
-            setSelectedExpert(undefined)
-          }}
-        >
-          Назад к списку экспертов
-        </Button>
-        <CreateAssistant 
-          initialConfig={selectedExpert}
-          onSave={() => {
-            setIsCreating(false)
-            setSelectedExpert(undefined)
-            loadExperts()
-          }}
-        />
+      <div className="relative">
+        <div className="absolute top-0 left-0 z-10 m-4">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => {
+              setIsCreating(false)
+              setSelectedExpert(undefined)
+            }}
+            className="hover:bg-accent"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-6 h-6"
+            >
+              <path d="m12 19-7-7 7-7"/>
+              <path d="M19 12H5"/>
+            </svg>
+          </Button>
+        </div>
+        <div>
+          <CreateAssistant 
+            initialConfig={selectedExpert}
+            onSave={() => {
+              setIsCreating(false)
+              setSelectedExpert(undefined)
+              loadExperts()
+            }}
+          />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="py-8 space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Управление экспертами</h2>
         <Button onClick={() => setIsCreating(true)}>
