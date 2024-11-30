@@ -8,7 +8,7 @@ import CreateAssistant from './CreateAssistant';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import defaultExperts from '@/config/experts.json';
 
-interface AssistantConfig {
+interface Expert {
   id: string;
   name: string;
   description: string;
@@ -27,99 +27,76 @@ interface AssistantConfig {
 }
 
 export default function ExpertManager() {
-  const [experts, setExperts] = useState<AssistantConfig[]>([]);
-  const [selectedExpert, setSelectedExpert] = useState<AssistantConfig | undefined>(undefined);
-  const [isCreateMode, setIsCreateMode] = useState(false);
+  const [experts, setExperts] = useState<Expert[]>([]);
+  const [selectedExpert, setSelectedExpert] = useState<Expert | undefined>(undefined);
+  const [mode, setMode] = useState<'list' | 'create' | 'edit'>('list');
 
-  // Загрузка данных из API после монтирования компонента
-  useEffect(() => {
-    const fetchExperts = async () => {
-      try {
-        const response = await fetch('/api/experts');
-        if (!response.ok) {
-          throw new Error('Failed to fetch experts');
-        }
-        const data = await response.json();
-        setExperts(
-          data.experts.map((expert: any): AssistantConfig => ({
-            ...expert,
-            provider: expert.provider as 'openai' | 'google',
-            capabilities: expert.capabilities || {
-              webBrowsing: false,
-              imageGeneration: false,
-              codeInterpreter: false,
-            },
-          }))
-        );
-      } catch (error) {
-        console.error('Error fetching experts:', error);
-        toast.error('Ошибка при загрузке экспертов');
-      }
-    };
-    
-    fetchExperts();
-  }, []);
-
-  // Обновляем эксперта через API
-  const updateExpert = async (expert: AssistantConfig) => {
+  // Функция для загрузки экспертов
+  const loadExperts = async () => {
     try {
-      const response = await fetch(`/api/experts/${expert.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(expert),
-      });
-      
+      const response = await fetch('/api/experts');
       if (!response.ok) {
-        throw new Error('Failed to update expert');
+        throw new Error('Failed to fetch experts');
       }
-      
-      // Обновляем локальное состояние после успешного обновления
-      setExperts(prev => prev.map(e => e.id === expert.id ? expert : e));
-      toast.success('Эксперт успешно обновлен');
+      const data = await response.json();
+      setExperts(data.map((expert: any): Expert => ({
+        ...expert,
+        provider: expert.provider as 'openai' | 'google',
+        capabilities: expert.capabilities || {
+          webBrowsing: false,
+          imageGeneration: false,
+          codeInterpreter: false,
+        },
+      })));
     } catch (error) {
-      console.error('Error updating expert:', error);
-      toast.error('Ошибка при обновлении эксперта');
+      console.error('Error loading experts:', error);
+      toast.error('Ошибка при загрузке экспертов');
     }
   };
 
-  // Удаляем эксперта через API
-  const handleDeleteExpert = async (expertId: string) => {
+  // Загружаем экспертов при монтировании компонента
+  useEffect(() => {
+    loadExperts();
+  }, []);
+
+  const handleCreateClick = () => {
+    setSelectedExpert(undefined);
+    setMode('create');
+  };
+
+  const handleEditClick = (expert: Expert) => {
+    setSelectedExpert(expert);
+    setMode('edit');
+  };
+
+  const handleSaveComplete = async () => {
+    await loadExperts(); // Перезагружаем список экспертов
+    setMode('list');
+  };
+
+  const handleDeleteClick = async (expert: Expert) => {
+    if (!confirm('Вы уверены, что хотите удалить этого эксперта?')) {
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/experts/${expertId}`, {
+      const response = await fetch(`/api/experts/${expert.id}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to delete expert');
       }
-      
-      // Обновляем локальное состояние после успешного удаления
-      setExperts(prev => prev.filter(expert => expert.id !== expertId));
+
       toast.success('Эксперт успешно удален');
+      await loadExperts(); // Перезагружаем список после удаления
     } catch (error) {
       console.error('Error deleting expert:', error);
       toast.error('Ошибка при удалении эксперта');
     }
   };
 
-  const handleEditExpert = (expert: AssistantConfig) => {
-    setSelectedExpert(expert);
-    setIsCreateMode(true);
-  };
-
-  const handleCreateNewExpert = () => {
-    setSelectedExpert(undefined);
-    setIsCreateMode(true);
-  };
-
-  const handleSaveComplete = () => {
-    setIsCreateMode(false);
-    setSelectedExpert(undefined);
-  };
-
-  if (isCreateMode) {
+  if (mode === 'create' || mode === 'edit') {
     return (
       <CreateAssistant
         initialConfig={selectedExpert}
@@ -132,7 +109,7 @@ export default function ExpertManager() {
     <div className="py-8 space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Управление экспертами</h2>
-        <Button onClick={handleCreateNewExpert}>
+        <Button onClick={handleCreateClick}>
           <Plus className="mr-2 h-4 w-4" />
           Создать нового эксперта
         </Button>
@@ -179,14 +156,14 @@ export default function ExpertManager() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => handleEditExpert(expert)}
+                  onClick={() => handleEditClick(expert)}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => handleDeleteExpert(expert.id)}
+                  onClick={() => handleDeleteClick(expert)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

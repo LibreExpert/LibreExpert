@@ -40,8 +40,17 @@ interface Props {
 }
 
 export default function CreateAssistant({ initialConfig, onSave }: Props) {
-  const [config, setConfig] = useState<AssistantConfig>(
-    initialConfig || {
+  const [config, setConfig] = useState<AssistantConfig>(() => {
+    if (initialConfig) {
+      return {
+        ...initialConfig,
+        temperature: Number(initialConfig.temperature) || 0.7,
+        presence_penalty: Number(initialConfig.presence_penalty) || 0.6,
+        frequency_penalty: Number(initialConfig.frequency_penalty) || 0.5,
+        top_p: Number(initialConfig.top_p) || 0.9
+      }
+    }
+    return {
       id: '',
       model: 'gpt-4',
       provider: 'openai',
@@ -58,7 +67,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         codeInterpreter: false
       }
     }
-  )
+  })
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -116,12 +125,17 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       const newExpertId = initialConfig?.id || config.name.toLowerCase().replace(/\s+/g, '-')
       const newExpert = { ...config, id: newExpertId }
       
-      const updatedExperts = initialConfig 
-        ? experts.map(e => e.id === initialConfig.id ? newExpert : e)
-        : [...experts, newExpert]
+      const response = await fetch('/api/experts', {
+        method: initialConfig ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newExpert)
+      })
 
-      setExperts(updatedExperts)
-      localStorage.setItem('experts', JSON.stringify(updatedExperts))
+      if (!response.ok) {
+        throw new Error('Failed to save expert')
+      }
 
       toast.success(initialConfig ? 'Эксперт успешно обновлен' : 'Эксперт успешно создан')
       
@@ -351,9 +365,9 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={0}
                     max={2}
                     step={0.1}
-                    value={config.temperature}
+                    value={config.temperature || 0}
                     onChange={(e) =>
-                      setConfig({ ...config, temperature: parseFloat(e.target.value) })
+                      setConfig({ ...config, temperature: parseFloat(e.target.value) || 0 })
                     }
                     className="w-[180px]"
                   />
@@ -366,9 +380,9 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={0}
                     max={1}
                     step={0.1}
-                    value={config.top_p}
+                    value={config.top_p || 0}
                     onChange={(e) =>
-                      setConfig({ ...config, top_p: parseFloat(e.target.value) })
+                      setConfig({ ...config, top_p: parseFloat(e.target.value) || 0 })
                     }
                     className="w-[180px]"
                   />
@@ -381,11 +395,11 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={-2}
                     max={2}
                     step={0.1}
-                    value={config.presence_penalty}
+                    value={config.presence_penalty || 0}
                     onChange={(e) =>
                       setConfig({
                         ...config,
-                        presence_penalty: parseFloat(e.target.value)
+                        presence_penalty: parseFloat(e.target.value) || 0
                       })
                     }
                     className="w-[180px]"
@@ -399,11 +413,11 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={-2}
                     max={2}
                     step={0.1}
-                    value={config.frequency_penalty}
+                    value={config.frequency_penalty || 0}
                     onChange={(e) =>
                       setConfig({
                         ...config,
-                        frequency_penalty: parseFloat(e.target.value)
+                        frequency_penalty: parseFloat(e.target.value) || 0
                       })
                     }
                     className="w-[180px]"
