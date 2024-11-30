@@ -1,9 +1,14 @@
+import React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { Expert } from '../types/Expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import defaultExperts from '../config/experts.json';
 import { AIService } from '../services/ai.service';
 import { ExpertSelector } from './ExpertSelector';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -166,51 +171,16 @@ export default function Chat() {
   // Handle problem resolution response
   const handleProblemResolution = async (resolved: boolean) => {
     if (!currentChat) return;
-
-    const resolutionMessage: Message = {
-      role: 'user',
-      content: resolved ? 'Да, моя проблема решена. Спасибо!' : 'Нет, мне всё ещё нужна помощь.',
-      timestamp: Date.now()
-    };
-
-    const updatedChat = {
-      ...currentChat,
-      messages: [...currentChat.messages, resolutionMessage],
-      lastActivity: Date.now(),
-      problemResolved: resolved
-    };
-
+    
     setChats(prev => {
-      const newChats = prev.map(chat => 
-        chat.id === currentChat.id ? updatedChat : chat
+      const updatedChats = prev.map(chat => 
+        chat.id === currentChat.id 
+          ? { ...chat, problemResolved: resolved }
+          : chat
       );
-      localStorage.setItem('chats', JSON.stringify(newChats));
-      return newChats;
+      localStorage.setItem('chats', JSON.stringify(updatedChats));
+      return updatedChats;
     });
-    setCurrentChat(updatedChat);
-
-    if (!resolved) {
-      // Send follow-up message
-      const followUpMessage: Message = {
-        role: 'assistant',
-        content: 'Понятно. Давайте продолжим работу над вашей проблемой. Что именно осталось нерешённым?',
-        timestamp: Date.now()
-      };
-
-      const chatWithFollowUp = {
-        ...updatedChat,
-        messages: [...updatedChat.messages, followUpMessage]
-      };
-
-      setChats(prev => {
-        const newChats = prev.map(chat => 
-          chat.id === currentChat.id ? chatWithFollowUp : chat
-        );
-        localStorage.setItem('chats', JSON.stringify(newChats));
-        return newChats;
-      });
-      setCurrentChat(chatWithFollowUp);
-    }
   };
 
   // Auto-adjust textarea height
@@ -381,35 +351,80 @@ export default function Chat() {
                           : 'bg-gray-100'
                       }`}
                     >
-                      <div className="mb-1">{msg.content}</div>
-                      <div className="text-xs text-gray-500 mt-1 text-right">
-                        {msg.timestamp 
-                          ? new Date(msg.timestamp).toLocaleTimeString([], { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })
-                          : ''}
-                      </div>
-                      {msg.role === 'assistant' && 
-                       msg.content.includes('Удалось ли решить вашу проблему?') && 
-                       !currentChat.problemResolved && (
-                        <div className="mt-2 flex space-x-2">
-                          <button
-                            onClick={() => handleProblemResolution(true)}
-                            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                          >
-                            Да, решено
-                          </button>
-                          <button
-                            onClick={() => handleProblemResolution(false)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                          >
-                            Нет, нужна помощь
-                          </button>
-                        </div>
-                      )}
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                        className="prose prose-sm max-w-none dark:prose-invert"
+                        components={{
+                          pre: ({ children, ...props }) => {
+                            // Находим первый дочерний элемент code
+                            const codeElement = React.Children.toArray(children).find(
+                              (child): child is React.ReactElement => 
+                                React.isValidElement(child) && child.type === 'code'
+                            );
+                            
+                            return (
+                              <div className="relative group">
+                                <pre {...props} className="bg-gray-900 p-4 rounded-lg overflow-x-auto">
+                                  {children}
+                                </pre>
+                                <button
+                                  onClick={() => {
+                                    if (codeElement && typeof codeElement.props.children === 'string') {
+                                      navigator.clipboard.writeText(codeElement.props.children);
+                                    }
+                                  }}
+                                  className="absolute top-2 right-2 bg-gray-700 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            );
+                          },
+                          code: ({ className, children, ...props }) => {
+                            const match = /language-(\w+)/.exec(className || '');
+                            return match ? (
+                              <code {...props} className={className}>
+                                {children}
+                              </code>
+                            ) : (
+                              <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">
+                                {children}
+                              </code>
+                            );
+                          },
+                          p: ({ children }) => <p className="mb-4">{children}</p>,
+                          a: ({ children, href }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
                     </div>
                   </div>
+                ))}
+                {currentChat?.messages.map((msg, index) => (
+                  msg.role === 'assistant' && 
+                  msg.content.includes('Удалось ли решить вашу проблему?') && 
+                  !currentChat.problemResolved && (
+                    <div key={index} className="mt-2 flex space-x-2">
+                      <button
+                        onClick={() => handleProblemResolution(true)}
+                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        Да, решено
+                      </button>
+                      <button
+                        onClick={() => handleProblemResolution(false)}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        Нет, нужна помощь
+                      </button>
+                    </div>
+                  )
                 ))}
               </div>
             </ScrollArea>
