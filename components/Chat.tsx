@@ -209,7 +209,7 @@ export default function Chat() {
 
   // Send message
   const sendMessage = async () => {
-    if (!message.trim() || !apiKey || !selectedExpert || !aiServiceRef.current) return;
+    if (!message.trim() || !selectedExpert) return;
 
     const updatedChat: Chat = currentChat ? {
       ...currentChat,
@@ -251,19 +251,27 @@ export default function Chat() {
         setCurrentChat(updatedChat);
       }
 
-      // Generate response using LangChain
-      const messages = updatedChat.messages.map(msg => 
-        msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
-      );
-      
-      const responseContent = await aiServiceRef.current.generateResponse(
-        selectedExpert.systemPrompt,
-        messages
-      );
+      // Отправляем запрос к нашему API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: updatedChat.messages,
+          expertId: selectedExpert.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const aiResponse = await response.json();
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: responseContent,
+        content: aiResponse.content,
         timestamp: Date.now()
       };
 
@@ -285,6 +293,7 @@ export default function Chat() {
 
     } catch (error) {
       console.error('Error:', error);
+      // toast.error('Ошибка при получении ответа от AI');
     }
 
     setMessage('');

@@ -31,49 +31,77 @@ export default function ExpertManager() {
   const [selectedExpert, setSelectedExpert] = useState<AssistantConfig | undefined>(undefined);
   const [isCreateMode, setIsCreateMode] = useState(false);
 
-  // Загрузка данных из localStorage после монтирования компонента
+  // Загрузка данных из API после монтирования компонента
   useEffect(() => {
-    const stored = localStorage.getItem('experts');
-    if (stored) {
-      const parsedExperts = JSON.parse(stored);
-      setExperts(
-        parsedExperts.map((expert: any): AssistantConfig => ({
-          ...expert,
-          provider: expert.provider as 'openai' | 'google', // Явное приведение типа
-          capabilities: expert.capabilities || {
-            webBrowsing: false,
-            imageGeneration: false,
-            codeInterpreter: false,
-          },
-        }))
-      );
-    } else {
-      setExperts(
-        defaultExperts.experts.map((expert: any): AssistantConfig => ({
-          ...expert,
-          provider: expert.provider as 'openai' | 'google',
-          capabilities: expert.capabilities || {
-            webBrowsing: false,
-            imageGeneration: false,
-            codeInterpreter: false,
-          },
-        }))
-      );
-    }
+    const fetchExperts = async () => {
+      try {
+        const response = await fetch('/api/experts');
+        if (!response.ok) {
+          throw new Error('Failed to fetch experts');
+        }
+        const data = await response.json();
+        setExperts(
+          data.experts.map((expert: any): AssistantConfig => ({
+            ...expert,
+            provider: expert.provider as 'openai' | 'google',
+            capabilities: expert.capabilities || {
+              webBrowsing: false,
+              imageGeneration: false,
+              codeInterpreter: false,
+            },
+          }))
+        );
+      } catch (error) {
+        console.error('Error fetching experts:', error);
+        toast.error('Ошибка при загрузке экспертов');
+      }
+    };
+    
+    fetchExperts();
   }, []);
-  
 
-  // Сохраняем изменения в localStorage при каждом обновлении экспертов
-  useEffect(() => {
-    if (experts.length > 0) {
-      localStorage.setItem('experts', JSON.stringify(experts));
+  // Обновляем эксперта через API
+  const updateExpert = async (expert: AssistantConfig) => {
+    try {
+      const response = await fetch(`/api/experts/${expert.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(expert),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update expert');
+      }
+      
+      // Обновляем локальное состояние после успешного обновления
+      setExperts(prev => prev.map(e => e.id === expert.id ? expert : e));
+      toast.success('Эксперт успешно обновлен');
+    } catch (error) {
+      console.error('Error updating expert:', error);
+      toast.error('Ошибка при обновлении эксперта');
     }
-  }, [experts]);
+  };
 
-  const handleDeleteExpert = (expertId: string) => {
-    const updatedExperts = experts.filter((expert) => expert.id !== expertId);
-    setExperts(updatedExperts);
-    toast.success('Эксперт успешно удален');
+  // Удаляем эксперта через API
+  const handleDeleteExpert = async (expertId: string) => {
+    try {
+      const response = await fetch(`/api/experts/${expertId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete expert');
+      }
+      
+      // Обновляем локальное состояние после успешного удаления
+      setExperts(prev => prev.filter(expert => expert.id !== expertId));
+      toast.success('Эксперт успешно удален');
+    } catch (error) {
+      console.error('Error deleting expert:', error);
+      toast.error('Ошибка при удалении эксперта');
+    }
   };
 
   const handleEditExpert = (expert: AssistantConfig) => {
@@ -89,22 +117,6 @@ export default function ExpertManager() {
   const handleSaveComplete = () => {
     setIsCreateMode(false);
     setSelectedExpert(undefined);
-    // Обновляем список экспертов из localStorage
-    const stored = localStorage.getItem('experts');
-    if (stored) {
-      const parsedExperts = JSON.parse(stored);
-      setExperts(
-        parsedExperts.map((expert: AssistantConfig) => ({
-          ...expert,
-          provider: expert.provider || 'openai',
-          capabilities: expert.capabilities || {
-            webBrowsing: false,
-            imageGeneration: false,
-            codeInterpreter: false,
-          },
-        }))
-      );
-    }
   };
 
   if (isCreateMode) {
