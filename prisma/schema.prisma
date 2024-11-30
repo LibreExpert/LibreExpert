@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Expert {
+  id                String   @id @default(cuid())
+  name              String
+  description       String
+  systemPrompt      String   @map("system_prompt")
+  model             String
+  provider          String
+  api_key           String?  @map("api_key")
+  temperature       Float
+  presencePenalty   Float    @map("presence_penalty")
+  frequencyPenalty  Float    @map("frequency_penalty")
+  topP              Float    @map("top_p")
+  capabilities      Json
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("experts")
+}
+
+model Chat {
+  id              String    @id @default(cuid())
+  expertId        String    @map("expert_id")
+  title           String
+  messages        Json
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastActivity    DateTime  @map("last_activity")
+  problemResolved Boolean   @default(false) @map("problem_resolved")
+
+  @@map("chats")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  provider  String   @unique
+  key       String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("api_keys")
+}

@@ -1,8 +1,11 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+    "composite": true,
+    "baseUrl": "src", // Указываем корневую директорию для путей
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["*"], // Общий алиас для всех папок
+      "@/components/*": ["components/*"], // Алиас для components
+      "@/lib/*": ["lib/*"] // Алиас для lib
     },
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
@@ -13,11 +16,9 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "moduleResolution": "node", // Изменяем на node для корректной работы с путями
     "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
     "jsx": "react-jsx",
 
     /* Linting */
@@ -26,5 +27,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"], // "components" уже включен через "src"
+  "exclude": ["node_modules", "dist"] // Добавляем исключение для node_modules и сборки
 }

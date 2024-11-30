@@ -1,9 +1,11 @@
+'use client'
+
 import React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { Expert } from '../types/Expert';
+import { Expert } from '@/types/expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import defaultExperts from '../config/experts.json';
-import { AIService } from '../services/ai.service';
+import { AIService } from '@/src/services/ai.service';
 import { ExpertSelector } from './ExpertSelector';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -207,7 +209,7 @@ export default function Chat() {
 
   // Send message
   const sendMessage = async () => {
-    if (!message.trim() || !apiKey || !selectedExpert || !aiServiceRef.current) return;
+    if (!message.trim() || !selectedExpert) return;
 
     const updatedChat: Chat = currentChat ? {
       ...currentChat,
@@ -249,19 +251,27 @@ export default function Chat() {
         setCurrentChat(updatedChat);
       }
 
-      // Generate response using LangChain
-      const messages = updatedChat.messages.map(msg => 
-        msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
-      );
-      
-      const responseContent = await aiServiceRef.current.generateResponse(
-        selectedExpert.systemPrompt,
-        messages
-      );
+      // Отправляем запрос к нашему API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: updatedChat.messages,
+          expertId: selectedExpert.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const aiResponse = await response.json();
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: responseContent,
+        content: aiResponse.content,
         timestamp: Date.now()
       };
 
@@ -283,6 +293,7 @@ export default function Chat() {
 
     } catch (error) {
       console.error('Error:', error);
+      // toast.error('Ошибка при получении ответа от AI');
     }
 
     setMessage('');
@@ -390,7 +401,7 @@ export default function Chat() {
                               (child): child is React.ReactElement => 
                                 React.isValidElement(child) && child.type === 'code'
                             );
-                            
+                             
                             return (
                               <div className="relative group">
                                 <pre {...props} className="bg-gray-900 p-4 rounded-lg overflow-x-auto">

@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect } from 'react'
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -13,6 +15,7 @@ interface AssistantConfig {
   id: string;
   model: string;
   provider: 'openai' | 'google';
+  api_key?: string;
   temperature: number;
   presence_penalty: number;
   frequency_penalty: number;
@@ -38,11 +41,21 @@ interface Props {
 }
 
 export default function CreateAssistant({ initialConfig, onSave }: Props) {
-  const [config, setConfig] = useState<AssistantConfig>(
-    initialConfig || {
+  const [config, setConfig] = useState<AssistantConfig>(() => {
+    if (initialConfig) {
+      return {
+        ...initialConfig,
+        temperature: Number(initialConfig.temperature) || 0.7,
+        presence_penalty: Number(initialConfig.presence_penalty) || 0.6,
+        frequency_penalty: Number(initialConfig.frequency_penalty) || 0.5,
+        top_p: Number(initialConfig.top_p) || 0.9
+      }
+    }
+    return {
       id: '',
       model: 'gpt-4',
       provider: 'openai',
+      api_key: '',
       temperature: 0.7,
       presence_penalty: 0.6,
       frequency_penalty: 0.5,
@@ -56,7 +69,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         codeInterpreter: false
       }
     }
-  )
+  })
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -69,14 +82,20 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
   const [testing, setTesting] = useState(false)
 
   useEffect(() => {
-    const savedOpenAIKey = localStorage.getItem('openai_api_key');
-    const savedGeminiKey = localStorage.getItem('gemini_api_key');
-    if (config.provider === 'openai' && savedOpenAIKey) {
-      setApiKey(savedOpenAIKey);
-    } else if (config.provider === 'google' && savedGeminiKey) {
-      setApiKey(savedGeminiKey);
+    // First check if the expert has a stored API key
+    if (initialConfig?.api_key) {
+      setApiKey(initialConfig.api_key);
+    } else {
+      // Fall back to localStorage if no API key is stored with the expert
+      const savedOpenAIKey = localStorage.getItem('openai_api_key');
+      const savedGeminiKey = localStorage.getItem('gemini_api_key');
+      if (config.provider === 'openai' && savedOpenAIKey) {
+        setApiKey(savedOpenAIKey);
+      } else if (config.provider === 'google' && savedGeminiKey) {
+        setApiKey(savedGeminiKey);
+      }
     }
-  }, [config.provider]);
+  }, [config.provider, initialConfig]);
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -112,14 +131,23 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
 
     try {
       const newExpertId = initialConfig?.id || config.name.toLowerCase().replace(/\s+/g, '-')
-      const newExpert = { ...config, id: newExpertId }
+      const newExpert = { 
+        ...config, 
+        id: newExpertId,
+        api_key: apiKey // Include the API key when saving
+      }
       
-      const updatedExperts = initialConfig 
-        ? experts.map(e => e.id === initialConfig.id ? newExpert : e)
-        : [...experts, newExpert]
+      const response = await fetch('/api/experts', {
+        method: initialConfig ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newExpert)
+      })
 
-      setExperts(updatedExperts)
-      localStorage.setItem('experts', JSON.stringify(updatedExperts))
+      if (!response.ok) {
+        throw new Error('Failed to save expert')
+      }
 
       toast.success(initialConfig ? 'Эксперт успешно обновлен' : 'Эксперт успешно создан')
       
@@ -128,6 +156,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
           id: '',
           model: 'gpt-4',
           provider: 'openai',
+          api_key: '',
           temperature: 0.7,
           presence_penalty: 0.6,
           frequency_penalty: 0.5,
@@ -236,14 +265,6 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
         >
           Сохранить
         </Button>
-        <Button
-          variant="default"
-          onClick={testConnection}
-          disabled={testing}
-          className="px-4"
-        >
-          {testing ? 'Тестирую...' : 'Тестировать'}
-        </Button>
       </header>
 
       <div className="flex gap-4 h-[calc(100vh-64px)]">
@@ -349,9 +370,9 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={0}
                     max={2}
                     step={0.1}
-                    value={config.temperature}
+                    value={config.temperature || 0}
                     onChange={(e) =>
-                      setConfig({ ...config, temperature: parseFloat(e.target.value) })
+                      setConfig({ ...config, temperature: parseFloat(e.target.value) || 0 })
                     }
                     className="w-[180px]"
                   />
@@ -364,9 +385,9 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={0}
                     max={1}
                     step={0.1}
-                    value={config.top_p}
+                    value={config.top_p || 0}
                     onChange={(e) =>
-                      setConfig({ ...config, top_p: parseFloat(e.target.value) })
+                      setConfig({ ...config, top_p: parseFloat(e.target.value) || 0 })
                     }
                     className="w-[180px]"
                   />
@@ -379,11 +400,11 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={-2}
                     max={2}
                     step={0.1}
-                    value={config.presence_penalty}
+                    value={config.presence_penalty || 0}
                     onChange={(e) =>
                       setConfig({
                         ...config,
-                        presence_penalty: parseFloat(e.target.value)
+                        presence_penalty: parseFloat(e.target.value) || 0
                       })
                     }
                     className="w-[180px]"
@@ -397,11 +418,11 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     min={-2}
                     max={2}
                     step={0.1}
-                    value={config.frequency_penalty}
+                    value={config.frequency_penalty || 0}
                     onChange={(e) =>
                       setConfig({
                         ...config,
-                        frequency_penalty: parseFloat(e.target.value)
+                        frequency_penalty: parseFloat(e.target.value) || 0
                       })
                     }
                     className="w-[180px]"

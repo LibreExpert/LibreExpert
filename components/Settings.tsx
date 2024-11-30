@@ -1,4 +1,7 @@
-import ExpertManager from '@/components/ExpertManager'
+'use client'
+
+import React from 'react'
+import ExpertManager from './ExpertManager'
 
 export default function Settings() {
   return (
