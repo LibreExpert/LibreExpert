@@ -5,7 +5,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Expert } from '@/types/expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import defaultExperts from '../config/experts.json';
-import { AIService } from '@/services/ai.service'; 
 import { ExpertSelector } from './ExpertSelector';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -33,11 +32,10 @@ export default function Chat() {
   const [message, setMessage] = useState('');
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
-  const [apiKey, setApiKey] = useState('');
   const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const aiServiceRef = useRef<AIService | null>(null);
 
   // Constants
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -81,39 +79,18 @@ export default function Chat() {
     }
   }, []);
 
-  // Load chats and API key from localStorage on component mount
+  // Load saved API keys on mount
   useEffect(() => {
-    const savedChats = localStorage.getItem('chats');
     const savedOpenAIKey = localStorage.getItem('openai_api_key');
     const savedGeminiKey = localStorage.getItem('gemini_api_key');
-    
-    if (savedChats) {
-      setChats(JSON.parse(savedChats));
-    }
-    
-    // Load appropriate API key based on selected expert's provider
+
     if (selectedExpert) {
       const key = selectedExpert.provider === 'openai' ? savedOpenAIKey : savedGeminiKey;
       if (key) {
-        setApiKey(key);
+        // setApiKey(key);
       }
     }
   }, [selectedExpert?.provider]);
-
-  // Initialize AI service when API key or expert changes
-  useEffect(() => {
-    if (apiKey && selectedExpert) {
-      aiServiceRef.current = new AIService(
-        apiKey,
-        selectedExpert.model,
-        selectedExpert.temperature,
-        selectedExpert.presence_penalty,
-        selectedExpert.frequency_penalty,
-        selectedExpert.top_p,
-        selectedExpert.provider
-      );
-    }
-  }, [apiKey, selectedExpert]);
 
   // Check for inactivity
   useEffect(() => {
@@ -209,7 +186,10 @@ export default function Chat() {
 
   // Send message
   const sendMessage = async () => {
-    if (!message.trim() || !selectedExpert) return;
+    if (!message.trim() || !selectedExpert || isLoading) return;
+
+    setIsLoading(true);
+    setMessage(''); // Очищаем инпут сразу
 
     const updatedChat: Chat = currentChat ? {
       ...currentChat,
@@ -294,9 +274,9 @@ export default function Chat() {
     } catch (error) {
       console.error('Error:', error);
       // toast.error('Ошибка при получении ответа от AI');
+    } finally {
+      setIsLoading(false);
     }
-
-    setMessage('');
   };
 
   return (
@@ -458,12 +438,18 @@ export default function Chat() {
                   placeholder="Введите сообщение..."
                   className="flex-1 resize-none border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={1}
+                  style={{ height: '40px' }}
                 />
                 <button
                   onClick={sendMessage}
-                  className="bg-blue-500 text-white rounded-lg px-6 py-2 hover:bg-blue-600"
+                  disabled={isLoading || !message.trim()}
+                  className={`${
+                    isLoading || !message.trim() 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-blue-500 hover:bg-blue-600'
+                  } text-white rounded-lg px-6 py-2`}
                 >
-                  Отправить
+                  {isLoading ? 'Отправка...' : 'Отправить'}
                 </button>
               </div>
             </div>
