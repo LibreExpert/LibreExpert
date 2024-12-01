@@ -1,6 +1,5 @@
 'use client'
 
-import { ScrollArea } from '../components/ui/scroll-area';
 import { useState, useEffect } from 'react';
 import { Expert } from '@/types/expert';
 
@@ -69,15 +68,15 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
   }
 
   return (
-    <ScrollArea className="h-[400px] w-full rounded-lg border border-[#565869] p-4 bg-[#343541]">
+    <div className="w-full bg-[#343541]">
       <div className="space-y-4">
         {experts.map((expert) => (
           <div
             key={expert.id}
-            className={`p-4 rounded-lg border transition-all ${
+            className={`p-4 rounded-lg transition-all ${
               selectedExpertId === expert.id
-                ? 'bg-[#444654] text-[#FFFFFF] border-[#10A37F]'
-                : 'bg-[#343541] text-[#FFFFFF] border-[#565869] hover:bg-[#2A2B32]'
+                ? 'bg-[#444654] text-[#FFFFFF]'
+                : 'bg-[#343541] text-[#FFFFFF] hover:bg-[#2A2B32]'
             } ${isSelecting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-105'}`}
             onClick={async () => {
               if (isSelecting) return;
@@ -94,6 +93,6 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
           </div>
         ))}
       </div>
-    </ScrollArea>
+    </div>
   );
 }
