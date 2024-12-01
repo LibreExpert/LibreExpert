@@ -2,7 +2,6 @@
 
 import { ScrollArea } from "../components/ui/scroll-area"
 import { useState, useEffect } from 'react'
-import defaultExperts from '@/config/experts.json'
 import { Expert } from '@/types/expert'
 
 interface ExpertSelectorProps {
@@ -42,17 +41,7 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
         setExperts(data)
       } catch (error) {
         console.error('Error loading experts:', error)
-        // Загружаем дефолтных экспертов как резервный вариант
-        const defaultExpertsWithCapabilities = defaultExperts.experts.map(expert => ({
-          ...expert,
-          provider: expert.provider as 'openai' | 'google',
-          capabilities: {
-            webBrowsing: false,
-            imageGeneration: false,
-            codeInterpreter: false
-          }
-        }))
-        setExperts(defaultExpertsWithCapabilities)
+        setExperts([]) // В случае ошибки устанавливаем пустой массив
       }
     }
     
