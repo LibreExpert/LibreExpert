@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { OpenAIEmbeddings as Embeddings } from '@langchain/openai';
 
 // Create a utility function for generating CUID
 const createId = () => {
@@ -146,4 +147,33 @@ export class DocumentService {
       throw error;
     }
   }
+}
+
+export async function searchRelevantChunks(expertId: string, query: string, limit: number = 5): Promise<Array<{ content: string; similarity: number }>> {
+  const embedding = await generateEmbedding(query);
+  
+  // Convert embedding to Postgres vector format
+  const vectorString = `[${embedding.join(',')}]`;
+  
+  // Use cosine similarity to find most relevant chunks
+  const chunks = await prisma.$queryRaw`
+    SELECT 
+      dc.content,
+      1 - (dc.embedding <=> ${vectorString}::vector) as similarity
+    FROM document_chunks dc
+    JOIN documents d ON d.id = dc.document_id
+    WHERE d.expert_id = ${expertId}
+    ORDER BY similarity DESC
+    LIMIT ${limit};
+  `;
+
+  return chunks as Array<{ content: string; similarity: number }>;
+}
+
+async function generateEmbedding(query: string) {
+  const embeddings = new OpenAIEmbeddings({
+    openAIApiKey: process.env.OPENAI_API_KEY,
+    modelName: 'text-embedding-ada-002',
+  });
+  return await embeddings.embedQuery(query);
 }

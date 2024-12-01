@@ -1,21 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { randomUUID } from 'crypto';
+import { searchRelevantChunks } from '@/services/document.service';
+import type { Prisma } from '@prisma/client';
+
+type ChatWithMessages = Prisma.chatGetPayload<{
+  include: { messages: true }
+}>;
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: number;
-}
-
-interface DbChat {
-  id: string;
-  expertId: string;
-  browserId: string;
-  title: string;
-  createdAt: Date;
-  updatedAt: Date;
-  lastActivity: Date;
 }
 
 interface Chat {
@@ -27,18 +22,6 @@ interface Chat {
   createdAt: Date;
   updatedAt: Date;
   lastActivity: Date;
-}
-
-function mapDbChatToChat(dbChat: DbChat): Chat {
-  return {
-    id: dbChat.id,
-    expertId: dbChat.expertId,
-    browserId: dbChat.browserId,
-    title: dbChat.title,
-    createdAt: dbChat.createdAt,
-    updatedAt: dbChat.updatedAt,
-    lastActivity: dbChat.lastActivity
-  };
 }
 
 export async function GET(request: Request) {
@@ -62,7 +45,7 @@ export async function GET(request: Request) {
       }
     });
     
-    const formattedChats = chats.map(chat => ({
+    const formattedChats = chats.map((chat: ChatWithMessages) => ({
       id: chat.id,
       expertId: chat.expertId,
       browserId: chat.browserId,
@@ -131,6 +114,15 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Chat ID and messages array are required' }, { status: 400 });
     }
 
+    // Get the last user message
+    const lastUserMessage = [...body.messages].reverse().find(msg => msg.role === 'user');
+    
+    // If we have a user message, search for relevant chunks
+    let relevantChunks: { content: string; similarity: number }[] = [];
+    if (lastUserMessage) {
+      relevantChunks = await searchRelevantChunks(body.expertId, lastUserMessage.content);
+    }
+
     // Update chat's last activity
     const chat = await prisma.chat.update({
       where: {
@@ -151,13 +143,32 @@ export async function PUT(request: Request) {
 
     // Create new messages
     if (body.messages.length > 0) {
-      await prisma.message.createMany({
-        data: body.messages.map((msg: Message) => ({
+      // Add system message with context if we have relevant chunks
+      if (relevantChunks.length > 0) {
+        const contextMessage = {
           chatId: body.id,
-          role: msg.role,
-          content: msg.content
-        }))
-      });
+          role: 'system' as const,
+          content: 'Here is some relevant context from the documents:\n\n' + 
+                  relevantChunks.map(chunk => chunk.content).join('\n\n') +
+                  '\n\nPlease use this context to help answer the user\'s question.'
+        };
+        
+        await prisma.message.createMany({
+          data: [contextMessage, ...body.messages.map((msg: Message) => ({
+            chatId: body.id,
+            role: msg.role,
+            content: msg.content
+          }))]
+        });
+      } else {
+        await prisma.message.createMany({
+          data: body.messages.map((msg: Message) => ({
+            chatId: body.id,
+            role: msg.role,
+            content: msg.content
+          }))
+        });
+      }
     }
 
     // Fetch updated chat with messages
@@ -168,7 +179,7 @@ export async function PUT(request: Request) {
       include: {
         messages: true
       }
-    });
+    }) as ChatWithMessages;
 
     if (!updatedChat) {
       throw new Error('Failed to fetch updated chat');
