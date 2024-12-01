@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { searchRelevantChunks } from '@/services/document.service';
 import type { Prisma } from '@prisma/client';
+import { AIService } from '@/services/ai.service';
+import { SystemMessage } from '@langchain/core/messages';
 
 type ChatWithMessages = Prisma.chatGetPayload<{
   include: { messages: true }
@@ -22,6 +24,32 @@ interface Chat {
   createdAt: Date;
   updatedAt: Date;
   lastActivity: Date;
+}
+
+async function generateWelcomeMessage(expert: { 
+  systemPrompt: string | null; 
+  model: string;
+  provider: string;
+  api_key: string;
+  temperature: number;
+  presencePenalty: number;
+  frequencyPenalty: number;
+  topP: number;
+}): Promise<string> {
+  const aiService = new AIService(
+    expert.api_key,
+    expert.model,
+    expert.temperature,
+    expert.presencePenalty,
+    expert.frequencyPenalty,
+    expert.topP,
+    expert.provider as 'openai' | 'google'
+  );
+
+  const systemPrompt = expert.systemPrompt || 'You are a helpful AI assistant.';
+  const welcomePrompt = `${systemPrompt}\n\nGenerate a brief, friendly welcome message to start the conversation. Be concise and engaging.`;
+  
+  return await aiService.generateResponse(welcomePrompt, []);
 }
 
 export async function GET(request: Request) {
@@ -75,6 +103,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Browser ID and Expert ID are required' }, { status: 400 });
     }
 
+    // First get the expert to access their system prompt and settings
+    const expert = await prisma.expert.findUnique({
+      where: {
+        id: body.expertId
+      }
+    });
+
+    if (!expert) {
+      return NextResponse.json({ error: 'Expert not found' }, { status: 404 });
+    }
+
+    // Create the chat
     const chat = await prisma.chat.create({
       data: {
         expert: {
@@ -90,15 +130,44 @@ export async function POST(request: Request) {
       }
     });
 
+    // Generate and store welcome message
+    const welcomeMessage = await generateWelcomeMessage(expert);
+    
+    await prisma.message.create({
+      data: {
+        chatId: chat.id,
+        role: 'assistant',
+        content: welcomeMessage
+      }
+    });
+
+    // Fetch the updated chat with the welcome message
+    const updatedChat = await prisma.chat.findUnique({
+      where: {
+        id: chat.id
+      },
+      include: {
+        messages: true
+      }
+    }) as ChatWithMessages;
+
+    if (!updatedChat) {
+      throw new Error('Failed to fetch updated chat');
+    }
+
     return NextResponse.json({
-      id: chat.id,
-      expertId: chat.expertId,
-      browserId: chat.browserId,
-      title: chat.title,
-      messages: [],
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
-      lastActivity: chat.lastActivity
+      id: updatedChat.id,
+      expertId: updatedChat.expertId,
+      browserId: updatedChat.browserId,
+      title: updatedChat.title,
+      messages: updatedChat.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.createdAt.getTime()
+      })),
+      createdAt: updatedChat.createdAt,
+      updatedAt: updatedChat.updatedAt,
+      lastActivity: updatedChat.lastActivity
     });
   } catch (error) {
     console.error('Error creating chat:', error);
