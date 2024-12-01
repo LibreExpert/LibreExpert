@@ -404,12 +404,12 @@ export default function Chat() {
         </div>
 
         {/* GitHub Link */}
-        <div className="p-4 border-t border-red-500">
+        <div className="p-4 border-t border-[#10A37F]">
           <a 
             href="https://github.com/LibreExpert/LibreExpert" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-red-500 hover:text-red-400 transition-colors flex flex-col items-center"
+            className="text-[#10A37F] hover:text-[#0D926F] transition-colors flex flex-col items-center"
           >
             <div className="font-medium">LibreExpert</div>
           </a>
