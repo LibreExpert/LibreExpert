@@ -11,6 +11,8 @@ import { toast } from 'sonner'
 import { AIService } from '@/services/ai.service'
 import { HumanMessage } from '@langchain/core/messages'
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB в байтах
+
 interface AssistantConfig {
   id: string;
   model: string;
@@ -80,6 +82,8 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
     return stored ? JSON.parse(stored) : []
   })
   const [testing, setTesting] = useState(false)
+  const [files, setFiles] = useState<File[]>([])
+  const [error, setError] = useState<string>('')
 
   useEffect(() => {
     // First check if the expert has a stored API key
@@ -123,6 +127,24 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
     }
   }, [apiKey, config])
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
+
+    // Проверка размера файлов
+    const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      setError(`Следующие файлы превышают лимит в 10MB: ${oversizedFiles.map(f => f.name).join(', ')}`);
+      return;
+    }
+
+    setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+    setError('');
+  };
+
+  const removeFile = (fileName: string) => {
+    setFiles(prevFiles => prevFiles.filter(file => file.name !== fileName));
+  };
+
   const handleSaveExpert = async () => {
     if (!config.name) {
       toast.error('Введите название эксперта')
@@ -131,29 +153,34 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
 
     try {
       const newExpertId = initialConfig?.id || config.name.toLowerCase().replace(/\s+/g, '-')
-      const newExpert = { 
-        ...config, 
+      const newExpert = {
+        ...config,
         id: newExpertId,
-        ...(apiKey ? { api_key: apiKey } : {}) 
+        ...(apiKey ? { api_key: apiKey } : {})
       }
-      
+
       const url = initialConfig ? `/api/experts/${newExpertId}` : '/api/experts'
       const method = initialConfig ? 'PUT' : 'POST'
-      
+
+      const formData = new FormData();
+      formData.append('name', newExpert.name);
+      formData.append('description', newExpert.description);
+      formData.append('systemPrompt', newExpert.systemPrompt);
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newExpert)
-      })
+        body: formData
+      });
 
       if (!response.ok) {
         throw new Error('Failed to save expert')
       }
 
       toast.success(initialConfig ? 'Эксперт успешно обновлен' : 'Эксперт успешно создан')
-      
+
       if (!initialConfig) {
         setConfig({
           id: '',
@@ -174,8 +201,9 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
           }
         })
       }
-      
+
       setChatMessages([])
+      setFiles([])
       onSave?.()
     } catch (error) {
       console.error('Error saving expert:', error)
@@ -203,7 +231,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
 
       const testMessage = new HumanMessage('Привет! Это тестовое сообщение.');
       const response = await ai.generateResponse(config.systemPrompt, [testMessage]);
-      
+
       if (response) {
         toast.success('Соединение успешно установлено');
       }
@@ -234,7 +262,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       ];
       const humanMessages = messages.map(message => new HumanMessage(message.content));
       const response = await aiService.generateResponse(config.systemPrompt, humanMessages);
-      
+
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: response
@@ -431,6 +459,35 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
                     className="w-[180px]"
                   />
                 </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Обучающие файлы</label>
+              <Input
+                id="files"
+                type="file"
+                onChange={handleFileChange}
+                multiple
+                className="mb-2"
+              />
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+
+              {/* Список загруженных файлов */}
+              <div className="mt-2 space-y-2">
+                {files.map(file => (
+                  <div key={file.name} className="flex items-center justify-between bg-gray-100 p-2 rounded">
+                    <span className="text-sm">{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeFile(file.name)}
+                    >
+                      Удалить
+                    </Button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
