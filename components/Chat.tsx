@@ -399,175 +399,191 @@ export default function Chat() {
           </div>
         ) : (
           <>
-            <ScrollArea className="flex-1 p-4">
-              <div className="max-w-3xl mx-auto">
-                {currentChat?.messages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`py-6 ${
-                      msg.role === 'assistant' ? 'bg-[#444654]' : ''
-                    } -mx-4 px-4`}
-                  >
-                    <div className="max-w-3xl mx-auto flex gap-4">
-                      <div className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0">
-                        {msg.role === 'assistant' ? (
-                          <div className="bg-[#10A37F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
-                            AI
-                          </div>
-                        ) : (
-                          <div className="bg-[#40414F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
-                            U
-                          </div>
-                        )}
-                      </div>
-                      <div className="prose prose-invert flex-1">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                          components={{
-                            pre: ({ children, ...props }) => (
-                              <div className="relative group">
-                                <pre
-                                  {...props}
-                                  className="bg-[#40414F] p-4 rounded-lg overflow-x-auto"
-                                >
-                                  {children}
-                                </pre>
-                                <button
-                                  onClick={() => {
-                                    const codeElement = React.Children.toArray(children).find(
-                                      (child): child is React.ReactElement =>
-                                        React.isValidElement(child) && child.type === 'code'
-                                    );
-                                    if (
-                                      codeElement &&
-                                      typeof codeElement.props.children === 'string'
-                                    ) {
-                                      navigator.clipboard.writeText(
-                                        codeElement.props.children
-                                      );
-                                    }
-                                  }}
-                                  className="absolute top-2 right-2 bg-[#2A2B32] text-[#FFFFFF] px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  Copy
-                                </button>
-                              </div>
-                            ),
-                            code: ({ className, children, ...props }) => {
-                              const match = /language-(\w+)/.exec(className || '');
-                              return match ? (
-                                <code {...props} className={className}>
-                                  {children}
-                                </code>
-                              ) : (
-                                <code
-                                  {...props}
-                                  className="bg-[#40414F] px-1 py-0.5 rounded"
-                                >
-                                  {children}
-                                </code>
-                              );
-                            },
-                            p: ({ children }) => (
-                              <p className="text-[#FFFFFF] mb-4 last:mb-0">{children}</p>
-                            ),
-                            a: ({ children, href }) => (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[#10A37F] hover:underline"
-                              >
-                                {children}
-                              </a>
-                            ),
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
+            <div className="flex flex-col h-full">
+              {/* Заголовок чата */}
+              {selectedExpert && (
+                <div className="flex items-center p-4 border-b border-[#565869] bg-[#343541]">
+                  <div className="w-8 h-8 rounded-full bg-[#10A37F] flex items-center justify-center text-white mr-3">
+                    AI
                   </div>
-                ))}
-                {currentChat &&
-                  !currentChat.problemResolved &&
-                  currentChat.messages.some(
-                    (msg) =>
-                      msg.role === 'assistant' &&
-                      msg.content.includes('Удалось ли решить вашу проблему?')
-                  ) && (
-                    <div className="mt-2 flex justify-center space-x-2">
-                      <button
-                        onClick={() => handleProblemResolution(true)}
-                        className="px-3 py-1 bg-[#10A37F] text-[#FFFFFF] rounded hover:bg-[#0D926F] transition-colors"
-                      >
-                        Да, решено
-                      </button>
-                      <button
-                        onClick={() => handleProblemResolution(false)}
-                        className="px-3 py-1 bg-[#40414F] text-[#FFFFFF] rounded hover:bg-[#2A2B32] transition-colors"
-                      >
-                        Нет, нужна помощь
-                      </button>
-                    </div>
-                  )}
-              </div>
-            </ScrollArea>
-
-            {/* Message input */}
-            <div className="border-t border-[#565869] p-4">
-              <div className="max-w-3xl mx-auto">
-                <div className="relative">
-                  <textarea
-                    ref={textareaRef}
-                    value={message}
-                    onChange={(e) => {
-                      setMessage(e.target.value);
-                      adjustTextareaHeight();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    placeholder="Отправьте сообщение..."
-                    className="w-full rounded-lg bg-[#40414F] text-[#FFFFFF] placeholder-[#ACB2C0] p-4 pr-12 resize-none overflow-hidden border border-[#565869] focus:outline-none focus:border-[#10A37F] focus:ring-1 focus:ring-[#10A37F]"
-                    style={{ minHeight: '60px' }}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={isLoading || message.trim() === ''}
-                    className={`absolute right-2 bottom-2 p-2 rounded-lg ${
-                      isLoading || message.trim() === ''
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'bg-[#10A37F] hover:bg-[#0D926F] text-[#FFFFFF]'
-                    }`}
-                  >
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
+                  <div>
+                    <h2 className="text-[#FFFFFF] font-medium">{selectedExpert.name}</h2>
+                    <p className="text-sm text-[#ACB2C0]">{selectedExpert.description}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Область сообщений */}
+              <ScrollArea className="flex-1 p-4 overflow-y-auto">
+                <div className="max-w-3xl mx-auto">
+                  {currentChat?.messages.map((msg, index) => (
+                    <div
+                      key={index}
+                      className={`py-6 ${
+                        msg.role === 'assistant' ? 'bg-[#444654]' : ''
+                      } -mx-4 px-4`}
                     >
-                      <path
-                        d="M22 2L11 13"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M22 2L15 22L11 13L2 9L22 2Z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
+                      <div className="max-w-3xl mx-auto flex gap-4">
+                        <div className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0">
+                          {msg.role === 'assistant' ? (
+                            <div className="bg-[#10A37F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
+                              AI
+                            </div>
+                          ) : (
+                            <div className="bg-[#40414F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
+                              U
+                            </div>
+                          )}
+                        </div>
+                        <div className="prose prose-invert flex-1">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              pre: ({ children, ...props }) => (
+                                <div className="relative group">
+                                  <pre
+                                    {...props}
+                                    className="bg-[#40414F] p-4 rounded-lg overflow-x-auto"
+                                  >
+                                    {children}
+                                  </pre>
+                                  <button
+                                    onClick={() => {
+                                      const codeElement = React.Children.toArray(children).find(
+                                        (child): child is React.ReactElement =>
+                                          React.isValidElement(child) && child.type === 'code'
+                                      );
+                                      if (
+                                        codeElement &&
+                                        typeof codeElement.props.children === 'string'
+                                      ) {
+                                        navigator.clipboard.writeText(
+                                          codeElement.props.children
+                                        );
+                                      }
+                                    }}
+                                    className="absolute top-2 right-2 bg-[#2A2B32] text-[#FFFFFF] px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                              ),
+                              code: ({ className, children, ...props }) => {
+                                const match = /language-(\w+)/.exec(className || '');
+                                return match ? (
+                                  <code {...props} className={className}>
+                                    {children}
+                                  </code>
+                                ) : (
+                                  <code
+                                    {...props}
+                                    className="bg-[#40414F] px-1 py-0.5 rounded"
+                                  >
+                                    {children}
+                                  </code>
+                                );
+                              },
+                              p: ({ children }) => (
+                                <p className="text-[#FFFFFF] mb-4 last:mb-0">{children}</p>
+                              ),
+                              a: ({ children, href }) => (
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#10A37F] hover:underline"
+                                >
+                                  {children}
+                                </a>
+                              ),
+                            }}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {currentChat &&
+                    !currentChat.problemResolved &&
+                    currentChat.messages.some(
+                      (msg) =>
+                        msg.role === 'assistant' &&
+                        msg.content.includes('Удалось ли решить вашу проблему?')
+                    ) && (
+                      <div className="mt-2 flex justify-center space-x-2">
+                        <button
+                          onClick={() => handleProblemResolution(true)}
+                          className="px-3 py-1 bg-[#10A37F] text-[#FFFFFF] rounded hover:bg-[#0D926F] transition-colors"
+                        >
+                          Да, решено
+                        </button>
+                        <button
+                          onClick={() => handleProblemResolution(false)}
+                          className="px-3 py-1 bg-[#40414F] text-[#FFFFFF] rounded hover:bg-[#2A2B32] transition-colors"
+                        >
+                          Нет, нужна помощь
+                        </button>
+                      </div>
+                    )}
+                </div>
+              </ScrollArea>
+
+              {/* Message input */}
+              <div className="border-t border-[#565869] p-4">
+                <div className="max-w-3xl mx-auto">
+                  <div className="relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={message}
+                      onChange={(e) => {
+                        setMessage(e.target.value);
+                        adjustTextareaHeight();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Отправьте сообщение..."
+                      className="w-full rounded-lg bg-[#40414F] text-[#FFFFFF] placeholder-[#ACB2C0] p-4 pr-12 resize-none overflow-hidden border border-[#565869] focus:outline-none focus:border-[#10A37F] focus:ring-1 focus:ring-[#10A37F]"
+                      style={{ minHeight: '60px' }}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={isLoading || message.trim() === ''}
+                      className={`absolute right-2 bottom-2 p-2 rounded-lg ${
+                        isLoading || message.trim() === ''
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'bg-[#10A37F] hover:bg-[#0D926F] text-[#FFFFFF]'
+                      }`}
+                    >
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M22 2L11 13"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M22 2L15 22L11 13L2 9L22 2Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
