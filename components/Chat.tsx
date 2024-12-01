@@ -45,14 +45,7 @@ export default function Chat() {
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [browserId, setBrowserId] = useState<string>(() => {
-    let id = localStorage.getItem('browserId');
-    if (!id) {
-      id = generateUUID();
-      localStorage.setItem('browserId', id);
-    }
-    return id;
-  });
+  const [browserId, setBrowserId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [experts, setExperts] = useState<Expert[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -60,6 +53,16 @@ export default function Chat() {
 
   // Constants
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 минут в миллисекундах
+
+  // Инициализация browserId
+  useEffect(() => {
+    let id = localStorage.getItem('browserId');
+    if (!id) {
+      id = generateUUID();
+      localStorage.setItem('browserId', id);
+    }
+    setBrowserId(id);
+  }, []);
 
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
