@@ -417,7 +417,7 @@ export default function Chat() {
       </div>
 
       {/* Main Content */}
-      {!selectedExpert ? (
+      {!selectedExpert && !currentChat ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="max-w-2xl w-full mx-auto px-6 py-8 bg-[#343541] rounded-lg">
             <h1 className="text-3xl font-bold mb-8 text-center text-[#FFFFFF]">
