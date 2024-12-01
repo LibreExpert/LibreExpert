@@ -47,10 +47,9 @@ export default function Chat() {
   const [experts, setExperts] = useState<Expert[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [showExpertSelector, setShowExpertSelector] = useState(false);
 
   // Constants
-  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 минут в миллисекундах
 
   const handleExpertSelect = async (expert: Expert) => {
     try {
@@ -60,26 +59,23 @@ export default function Chat() {
 
       // Создаем новый чат с выбранным экспертом
       await createNewChat(expert);
-
-      // Скрываем ExpertSelector
-      setShowExpertSelector(false);
     } catch (error) {
       console.error('Error selecting expert:', error);
-      setError('Failed to select expert');
+      setError('Не удалось выбрать эксперта');
     }
   };
 
-  // Load experts from backend
+  // Загрузка экспертов с бэкенда
   useEffect(() => {
     const loadExperts = async () => {
       try {
         const response = await fetch('/api/experts');
-        if (!response.ok) throw new Error('Failed to fetch experts');
+        if (!response.ok) throw new Error('Не удалось получить список экспертов');
         const data = await response.json();
 
         setExperts(data);
 
-        // Set selected expert from localStorage or first expert
+        // Устанавливаем выбранного эксперта из localStorage или первого эксперта
         const savedExpertId = localStorage.getItem('selected_expert_id');
         const expert = savedExpertId
           ? data.find((e: Expert) => e.id === savedExpertId)
@@ -90,22 +86,22 @@ export default function Chat() {
         }
       } catch (error) {
         console.error('Error loading experts:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load experts');
+        setError(error instanceof Error ? error.message : 'Не удалось загрузить экспертов');
       }
     };
 
     loadExperts();
   }, []);
 
-  // Load chats from backend
+  // Загрузка чатов с бэкенда
   useEffect(() => {
     const loadChats = async () => {
       try {
         const response = await fetch(`/api/chats?browserId=${browserId}`);
-        if (!response.ok) throw new Error('Failed to fetch chats');
+        if (!response.ok) throw new Error('Не удалось получить список чатов');
         const data = await response.json();
 
-        // Сортируем чаты по lastActivity в порядке убывания
+        // Сортируем чаты по дате последней активности в порядке убывания
         const sortedChats = data.sort(
           (a: Chat, b: Chat) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
         );
@@ -123,14 +119,14 @@ export default function Chat() {
         }
       } catch (error) {
         console.error('Error loading chats:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load chats');
+        setError(error instanceof Error ? error.message : 'Не удалось загрузить чаты');
       }
     };
 
     loadChats();
   }, [browserId]);
 
-  // Check for inactivity
+  // Проверка на бездействие
   useEffect(() => {
     const checkInactivity = async () => {
       if (currentChat && !currentChat.problemResolved) {
@@ -158,17 +154,17 @@ export default function Chat() {
       }
     };
 
-    // Clear existing timeout
+    // Очистка предыдущего таймера
     if (inactivityTimeoutRef.current) {
       clearTimeout(inactivityTimeoutRef.current);
     }
 
-    // Set new timeout
+    // Установка нового таймера
     if (currentChat && !currentChat.problemResolved) {
       inactivityTimeoutRef.current = setTimeout(checkInactivity, INACTIVITY_TIMEOUT);
     }
 
-    // Cleanup
+    // Очистка при размонтировании
     return () => {
       if (inactivityTimeoutRef.current) {
         clearTimeout(inactivityTimeoutRef.current);
@@ -176,7 +172,7 @@ export default function Chat() {
     };
   }, [currentChat]);
 
-  // Create new chat
+  // Создание нового чата
   const createNewChat = async (expert: Expert) => {
     if (!expert) {
       return;
@@ -195,7 +191,7 @@ export default function Chat() {
     };
 
     try {
-      // Save to backend first
+      // Сохранение на бэкенде
       const response = await fetch('/api/chats', {
         method: 'POST',
         headers: {
@@ -205,12 +201,12 @@ export default function Chat() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create chat on backend');
+        throw new Error('Не удалось создать чат на бэкенде');
       }
 
       const savedChat = await response.json();
 
-      // Update local state only after successful backend save
+      // Обновляем локальное состояние после успешного сохранения на бэкенде
       setChats((prev) => {
         const updatedChats = [...prev, savedChat].sort(
           (a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
@@ -220,7 +216,7 @@ export default function Chat() {
       setCurrentChat(savedChat);
     } catch (error) {
       console.error('Error creating chat:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create chat');
+      setError(error instanceof Error ? error.message : 'Не удалось создать чат');
     }
   };
 
@@ -236,13 +232,13 @@ export default function Chat() {
         timestamp: Date.now(),
       };
 
-      // Add message to UI immediately
+      // Добавляем сообщение в UI сразу
       setCurrentChat((prevChat) => ({
         ...prevChat!,
         messages: [...prevChat!.messages, newMessage],
       }));
 
-      // Send message to API
+      // Отправляем сообщение на API
       const response = await fetch(`/api/chats/${currentChat.id}/messages`, {
         method: 'POST',
         headers: {
@@ -255,25 +251,25 @@ export default function Chat() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error('Не удалось отправить сообщение');
       }
 
-      // Clear input
+      // Очищаем поле ввода
       setMessage('');
 
-      // Scroll to bottom
+      // Скроллим вниз
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      setError('Failed to send message');
+      setError('Не удалось отправить сообщение');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle problem resolution response
+  // Обработка ответа на вопрос о решении проблемы
   const handleProblemResolution = async (resolved: boolean) => {
     if (!currentChat) return;
 
@@ -285,7 +281,7 @@ export default function Chat() {
     });
   };
 
-  // Auto-adjust textarea height
+  // Автоизменение высоты текстового поля
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -294,10 +290,11 @@ export default function Chat() {
   }, [message]);
 
   const handleNewChat = () => {
-    // Отображаем компонент ExpertSelector
-    setShowExpertSelector(true);
-    // Очищаем текущий чат
+    // Очищаем текущий чат и выбранного эксперта
     setCurrentChat(null);
+    setSelectedExpert(null);
+    setMessage('');
+    localStorage.removeItem('selected_chat_id');
   };
 
   return (
@@ -333,7 +330,12 @@ export default function Chat() {
               }`}
               onClick={() => {
                 setCurrentChat(chat);
-                setShowExpertSelector(false);
+                // Устанавливаем выбранного эксперта для чата
+                const expert = experts.find((e) => e.id === chat.expertId);
+                if (expert) {
+                  setSelectedExpert(expert);
+                }
+                localStorage.setItem('selected_chat_id', chat.id);
               }}
             >
               <svg
@@ -356,18 +358,7 @@ export default function Chat() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col bg-[#343541]">
-        {showExpertSelector ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="max-w-4xl mx-auto px-4">
-              <h1 className="text-2xl font-bold mb-8 text-center text-white">
-                Выберите эксперта для нового чата
-              </h1>
-              <div className="mb-4">
-                <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
-              </div>
-            </div>
-          </div>
-        ) : selectedExpert && currentChat ? (
+        {currentChat && selectedExpert ? (
           <>
             <ScrollArea className="flex-1 p-4">
               <div className="max-w-3xl mx-auto">
@@ -530,8 +521,15 @@ export default function Chat() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-white">
-            Выберите чат или начните новый
+          <div className="flex-1 flex items-center justify-center">
+            <div className="max-w-4xl mx-auto px-4">
+              <h1 className="text-2xl font-bold mb-8 text-center text-white">
+                Выберите эксперта для нового чата
+              </h1>
+              <div className="mb-4">
+                <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
+              </div>
+            </div>
           </div>
         )}
       </div>
