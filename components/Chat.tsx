@@ -240,6 +240,12 @@ export default function Chat() {
         timestamp: Date.now(),
       };
 
+      // Очищаем поле ввода сразу после создания сообщения
+      setMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+
       // Добавляем сообщение в UI сразу
       setCurrentChat((prevChat) => ({
         ...prevChat!,
@@ -274,9 +280,6 @@ export default function Chat() {
           timestamp: Date.now()
         }],
       }));
-
-      // Очищаем поле ввода
-      setMessage('');
 
       // Скроллим вниз
       if (textareaRef.current) {
