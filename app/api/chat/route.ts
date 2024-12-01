@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Expert } from '@/types/expert'
-import { AIService } from '@/src/services/ai.service'
+import { AIService, ModelProvider } from '@/services/ai.service'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { prisma } from '@/lib/prisma'
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       expert.presencePenalty,
       expert.frequencyPenalty,
       expert.topP,
-      expert.provider
+      expert.provider as ModelProvider
     )
 
     // Преобразуем сообщения в формат LangChain
