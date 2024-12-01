@@ -30,6 +30,7 @@ interface StoredExpert {
 export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorProps) {
   const [experts, setExperts] = useState<Expert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   useEffect(() => {
     const loadExperts = async () => {
@@ -73,12 +74,20 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
         {experts.map((expert) => (
           <div
             key={expert.id}
-            className={`p-4 rounded-lg border shadow-sm cursor-pointer transition-all hover:scale-105 ${
+            className={`p-4 rounded-lg border shadow-sm transition-all ${
               selectedExpertId === expert.id
                 ? 'bg-blue-600 text-white border-blue-500'
                 : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
-            }`}
-            onClick={() => onSelect(expert)}
+            } ${isSelecting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-105'}`}
+            onClick={async () => {
+              if (isSelecting) return;
+              setIsSelecting(true);
+              try {
+                await onSelect(expert);
+              } finally {
+                setIsSelecting(false);
+              }
+            }}
           >
             <h3 className="font-semibold text-lg">{expert.name}</h3>
             <p className="text-sm mt-1 opacity-80">{expert.description}</p>
