@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ExpertSelector } from '@/components/ExpertSelector'
 import type { Expert } from '@/types/expert'
 
@@ -9,8 +9,22 @@ export default function NewChatPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [browserId, setBrowserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Получаем browser ID из localStorage
+    const storedBrowserId = localStorage.getItem('browser_id')
+    if (storedBrowserId) {
+      setBrowserId(storedBrowserId)
+    }
+  }, [])
 
   const handleExpertSelect = async (expert: Expert) => {
+    if (!browserId) {
+      setError('Browser ID not found')
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -26,6 +40,7 @@ export default function NewChatPage() {
         body: JSON.stringify({
           expertId: expert.id,
           title: expert.name,
+          browserId,
         }),
       })
 

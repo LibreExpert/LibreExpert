@@ -1,21 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { searchRelevantChunks } from '@/services/document.service';
-import type { Prisma } from '@prisma/client';
 import { AIService } from '@/services/ai.service';
 import { SystemMessage } from '@langchain/core/messages';
-
-type ChatWithMessages = Prisma.chatGetPayload<{
-  include: { messages: true }
-}>;
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp?: number;
+  createdAt: Date;
 }
 
-interface Chat {
+interface ChatWithMessages {
   id: string;
   expertId: string;
   browserId: string;
@@ -25,6 +20,8 @@ interface Chat {
   updatedAt: Date;
   lastActivity: Date;
 }
+
+type Chat = ChatWithMessages;
 
 async function generateWelcomeMessage(expert: { 
   systemPrompt: string | null; 
@@ -78,7 +75,7 @@ export async function GET(request: Request) {
       expertId: chat.expertId,
       browserId: chat.browserId,
       title: chat.title,
-      messages: chat.messages.map(msg => ({
+      messages: chat.messages.map((msg: Message) => ({
         role: msg.role,
         content: msg.content,
         timestamp: msg.createdAt.getTime()
@@ -160,7 +157,7 @@ export async function POST(request: Request) {
       expertId: updatedChat.expertId,
       browserId: updatedChat.browserId,
       title: updatedChat.title,
-      messages: updatedChat.messages.map(msg => ({
+      messages: updatedChat.messages.map((msg: Message) => ({
         role: msg.role,
         content: msg.content,
         timestamp: msg.createdAt.getTime()
@@ -259,7 +256,7 @@ export async function PUT(request: Request) {
       expertId: updatedChat.expertId,
       browserId: updatedChat.browserId,
       title: updatedChat.title,
-      messages: updatedChat.messages.map(msg => ({
+      messages: updatedChat.messages.map((msg: Message) => ({
         role: msg.role,
         content: msg.content,
         timestamp: msg.createdAt.getTime()
