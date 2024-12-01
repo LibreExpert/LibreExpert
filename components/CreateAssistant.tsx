@@ -53,7 +53,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
     }
     return {
       id: '',
-      model: 'gpt-4o',
+      model: 'gpt-4',
       provider: 'openai',
       api_key: '',
       temperature: 0.7,
@@ -157,7 +157,7 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       if (!initialConfig) {
         setConfig({
           id: '',
-          model: 'gpt-4o',
+          model: 'gpt-4',
           provider: 'openai',
           api_key: '',
           temperature: 0.7,
