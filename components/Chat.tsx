@@ -532,11 +532,11 @@ export default function Chat() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <div className="max-w-4xl mx-auto px-4">
-              <h1 className="text-2xl font-bold mb-8 text-center text-white">
+            <div className="max-w-2xl w-full mx-auto px-6 py-8 bg-gray-900 rounded-lg shadow-xl">
+              <h1 className="text-3xl font-bold mb-8 text-center text-white">
                 Выберите эксперта для нового чата
               </h1>
-              <div className="mb-4">
+              <div className="space-y-4">
                 <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
               </div>
             </div>
