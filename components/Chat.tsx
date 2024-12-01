@@ -299,35 +299,6 @@ export default function Chat() {
     setMessage('');
   };
 
-  // Render API key input if not set
-  if (!apiKey) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="w-96 p-6 bg-white rounded-lg shadow-lg">
-          <h2 className="text-xl font-bold mb-4">
-            {selectedExpert?.provider === 'openai' ? 'Введите API ключ OpenAI' : 'Введите API ключ Google Gemini'}
-          </h2>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => {
-              const key = e.target.value;
-              setApiKey(key);
-              if (selectedExpert) {
-                localStorage.setItem(
-                  selectedExpert.provider === 'openai' ? 'openai_api_key' : 'gemini_api_key',
-                  key
-                );
-              }
-            }}
-            placeholder={selectedExpert?.provider === 'openai' ? "sk-..." : "AI..."}
-            className="w-full p-2 border rounded mb-4"
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen">
       {/* Left sidebar */}
