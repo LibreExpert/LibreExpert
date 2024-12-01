@@ -55,7 +55,7 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-white">Загрузка экспертов...</div>
+        <div className="text-[#FFFFFF]">Загрузка экспертов...</div>
       </div>
     );
   }
@@ -63,21 +63,21 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
   if (experts.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-white">Нет доступных экспертов.</div>
+        <div className="text-[#FFFFFF]">Нет доступных экспертов.</div>
       </div>
     );
   }
 
   return (
-    <ScrollArea className="h-[400px] w-full rounded-lg border border-gray-700 p-4 bg-gray-800 shadow-md">
+    <ScrollArea className="h-[400px] w-full rounded-lg border border-[#565869] p-4 bg-[#343541]">
       <div className="space-y-4">
         {experts.map((expert) => (
           <div
             key={expert.id}
-            className={`p-4 rounded-lg border shadow-sm transition-all ${
+            className={`p-4 rounded-lg border transition-all ${
               selectedExpertId === expert.id
-                ? 'bg-blue-600 text-white border-blue-500'
-                : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                ? 'bg-[#444654] text-[#FFFFFF] border-[#10A37F]'
+                : 'bg-[#343541] text-[#FFFFFF] border-[#565869] hover:bg-[#2A2B32]'
             } ${isSelecting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-105'}`}
             onClick={async () => {
               if (isSelecting) return;
@@ -89,8 +89,8 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
               }
             }}
           >
-            <h3 className="font-semibold text-lg">{expert.name}</h3>
-            <p className="text-sm mt-1 opacity-80">{expert.description}</p>
+            <h3 className="font-semibold text-lg text-[#FFFFFF]">{expert.name}</h3>
+            <p className="text-sm mt-1 text-[#ACB2C0]">{expert.description}</p>
           </div>
         ))}
       </div>

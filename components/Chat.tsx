@@ -84,16 +84,6 @@ export default function Chat() {
         const data = await response.json();
 
         setExperts(data);
-
-        // Устанавливаем выбранного эксперта из localStorage или первого эксперта
-        const savedExpertId = localStorage.getItem('selected_expert_id');
-        const expert = savedExpertId
-          ? data.find((e: Expert) => e.id === savedExpertId)
-          : data[0];
-
-        if (expert) {
-          setSelectedExpert(expert);
-        }
       } catch (error) {
         console.error('Error loading experts:', error);
         setError(error instanceof Error ? error.message : 'Не удалось загрузить экспертов');
@@ -307,13 +297,23 @@ export default function Chat() {
     localStorage.removeItem('selected_chat_id');
   };
 
+  const handleChatSelect = (chat: Chat) => {
+    setCurrentChat(chat);
+    // Устанавливаем выбранного эксперта для чата
+    const expert = experts.find((e) => e.id === chat.expertId);
+    if (expert) {
+      setSelectedExpert(expert);
+    }
+    localStorage.setItem('selected_chat_id', chat.id);
+  };
+
   return (
     <div className="flex h-screen bg-[#343541]">
       {/* Sidebar */}
-      <div className="w-64 bg-[#202123] text-white p-2 flex flex-col">
+      <div className="w-64 bg-[#202123] text-[#FFFFFF] p-2 flex flex-col">
         <button
           onClick={handleNewChat}
-          className="w-full bg-transparent hover:bg-[#2A2B32] border border-[#565869] text-white rounded-lg px-4 py-2 mb-4 flex items-center gap-2"
+          className="w-full bg-transparent hover:bg-[#2A2B32] border border-[#565869] text-[#FFFFFF] rounded-lg px-4 py-2 mb-4 flex items-center gap-2"
         >
           <svg
             width="24"
@@ -331,6 +331,7 @@ export default function Chat() {
           </svg>
           Новый чат
         </button>
+
         <div className="flex-1 overflow-auto space-y-2">
           {chats.map((chat) => (
             <div
@@ -340,7 +341,6 @@ export default function Chat() {
               }`}
               onClick={() => {
                 setCurrentChat(chat);
-                // Устанавливаем выбранного эксперта для чата
                 const expert = experts.find((e) => e.id === chat.expertId);
                 if (expert) {
                   setSelectedExpert(expert);
@@ -360,7 +360,7 @@ export default function Chat() {
                   fill="currentColor"
                 />
               </svg>
-              <div className="flex-1 truncate text-sm">{chat.title}</div>
+              <div className="flex-1 truncate text-sm text-[#FFFFFF]">{chat.title}</div>
             </div>
           ))}
         </div>
@@ -368,11 +368,22 @@ export default function Chat() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col bg-[#343541]">
-        {currentChat && selectedExpert ? (
+        {!selectedExpert ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="max-w-2xl w-full mx-auto px-6 py-8 bg-[#343541] rounded-lg">
+              <h1 className="text-3xl font-bold mb-8 text-center text-[#FFFFFF]">
+                Выберите эксперта для нового чата
+              </h1>
+              <div className="space-y-4">
+                <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
+              </div>
+            </div>
+          </div>
+        ) : (
           <>
             <ScrollArea className="flex-1 p-4">
               <div className="max-w-3xl mx-auto">
-                {currentChat.messages.map((msg, index) => (
+                {currentChat?.messages.map((msg, index) => (
                   <div
                     key={index}
                     className={`py-6 ${
@@ -382,11 +393,11 @@ export default function Chat() {
                     <div className="max-w-3xl mx-auto flex gap-4">
                       <div className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0">
                         {msg.role === 'assistant' ? (
-                          <div className="bg-[#10a37f] rounded-sm w-full h-full flex items-center justify-center text-white">
+                          <div className="bg-[#10A37F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
                             AI
                           </div>
                         ) : (
-                          <div className="bg-[#7C7C8A] rounded-sm w-full h-full flex items-center justify-center text-white">
+                          <div className="bg-[#40414F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
                             U
                           </div>
                         )}
@@ -400,7 +411,7 @@ export default function Chat() {
                               <div className="relative group">
                                 <pre
                                   {...props}
-                                  className="bg-[#1E1E1E] p-4 rounded-lg overflow-x-auto"
+                                  className="bg-[#40414F] p-4 rounded-lg overflow-x-auto"
                                 >
                                   {children}
                                 </pre>
@@ -419,7 +430,7 @@ export default function Chat() {
                                       );
                                     }
                                   }}
-                                  className="absolute top-2 right-2 bg-[#2A2B32] text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute top-2 right-2 bg-[#2A2B32] text-[#FFFFFF] px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   Copy
                                 </button>
@@ -434,21 +445,21 @@ export default function Chat() {
                               ) : (
                                 <code
                                   {...props}
-                                  className="bg-[#2A2B32] px-1 py-0.5 rounded"
+                                  className="bg-[#40414F] px-1 py-0.5 rounded"
                                 >
                                   {children}
                                 </code>
                               );
                             },
                             p: ({ children }) => (
-                              <p className="text-white mb-4 last:mb-0">{children}</p>
+                              <p className="text-[#FFFFFF] mb-4 last:mb-0">{children}</p>
                             ),
                             a: ({ children, href }) => (
                               <a
                                 href={href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[#10a37f] hover:underline"
+                                className="text-[#10A37F] hover:underline"
                               >
                                 {children}
                               </a>
@@ -471,13 +482,13 @@ export default function Chat() {
                     <div className="mt-2 flex justify-center space-x-2">
                       <button
                         onClick={() => handleProblemResolution(true)}
-                        className="px-3 py-1 bg-[#10a37f] text-white rounded hover:bg-[#0d926f] transition-colors"
+                        className="px-3 py-1 bg-[#10A37F] text-[#FFFFFF] rounded hover:bg-[#0D926F] transition-colors"
                       >
                         Да, решено
                       </button>
                       <button
                         onClick={() => handleProblemResolution(false)}
-                        className="px-3 py-1 bg-[#2A2B32] text-white rounded hover:bg-[#444654] transition-colors"
+                        className="px-3 py-1 bg-[#40414F] text-[#FFFFFF] rounded hover:bg-[#2A2B32] transition-colors"
                       >
                         Нет, нужна помощь
                       </button>
@@ -487,60 +498,62 @@ export default function Chat() {
             </ScrollArea>
 
             {/* Message input */}
-            <div className="border-t border-[#2A2B32] p-4">
-              <div className="max-w-3xl mx-auto relative">
-                <textarea
-                  ref={textareaRef}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Введите сообщение..."
-                  className="w-full bg-[#40414F] text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#10a37f] resize-none"
-                  rows={1}
-                  style={{ minHeight: '44px', maxHeight: '200px' }}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={isLoading || !message.trim()}
-                  className="absolute right-2 bottom-1.5 p-2 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={message.trim() ? 'text-[#10a37f]' : 'text-gray-400'}
+            <div className="border-t border-[#565869] p-4">
+              <div className="max-w-3xl mx-auto">
+                <div className="relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      adjustTextareaHeight();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Отправьте сообщение..."
+                    className="w-full rounded-lg bg-[#40414F] text-[#FFFFFF] placeholder-[#ACB2C0] p-4 pr-12 resize-none overflow-hidden border border-[#565869] focus:outline-none focus:border-[#10A37F] focus:ring-1 focus:ring-[#10A37F]"
+                    style={{ minHeight: '60px' }}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={isLoading || message.trim() === ''}
+                    className={`absolute right-2 bottom-2 p-2 rounded-lg ${
+                      isLoading || message.trim() === ''
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'bg-[#10A37F] hover:bg-[#0D926F] text-[#FFFFFF]'
+                    }`}
                   >
-                    <path
-                      d="M7 11L12 6M12 6L17 11M12 6V20"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      transform="rotate(90 12 12)"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M22 2L11 13"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M22 2L15 22L11 13L2 9L22 2Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="max-w-2xl w-full mx-auto px-6 py-8 bg-gray-900 rounded-lg shadow-xl">
-              <h1 className="text-3xl font-bold mb-8 text-center text-white">
-                Выберите эксперта для нового чата
-              </h1>
-              <div className="space-y-4">
-                <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>
