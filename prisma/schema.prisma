@@ -43,7 +43,6 @@ model Chat {
   lastActivity    DateTime  @default(now()) @map("last_activity")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-  problemResolved Boolean   @default(false) @map("problemResolved")
 
   @@index([browserId])
   @@map("chats")
@@ -66,7 +65,7 @@ model Document {
   expert      Expert          @relation(fields: [expertId], references: [id], onDelete: Cascade)
   expertId    String          @map("expert_id")
   filename    String
-  content     String   @db.Text
+  content     String
   chunks      DocumentChunk[]
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
@@ -78,7 +77,7 @@ model DocumentChunk {
   id          String   @id @default(cuid())
   document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   documentId  String   @map("document_id")
-  content     String   @db.Text
+  content     String
   embedding   Unsupported("vector(1536)")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
