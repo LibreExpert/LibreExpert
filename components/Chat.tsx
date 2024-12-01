@@ -196,7 +196,7 @@ export default function Chat() {
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
-      title: `Чат с ${expert.name} ${new Date().toLocaleString()}`,
+      title: `${expert.name} ${new Date().toLocaleString()}`,
       lastActivity: new Date(),
       problemResolved: false,
     };
