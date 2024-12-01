@@ -28,14 +28,6 @@ interface Chat {
   problemResolved: boolean;
 }
 
-interface ExpertWithCapabilities extends Expert {
-  capabilities: {
-    webBrowsing: boolean;
-    imageGeneration: boolean;
-    codeInterpreter: boolean;
-  };
-}
-
 export default function Chat() {
   const router = useRouter();
   const [message, setMessage] = useState('');
@@ -55,6 +47,7 @@ export default function Chat() {
   const [experts, setExperts] = useState<Expert[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showExpertSelector, setShowExpertSelector] = useState(false);
 
   // Constants
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -68,8 +61,8 @@ export default function Chat() {
       // Создаем новый чат с выбранным экспертом
       await createNewChat(expert);
 
-      // Перенаправляем на главную страницу
-      router.push('/');
+      // Скрываем ExpertSelector
+      setShowExpertSelector(false);
     } catch (error) {
       console.error('Error selecting expert:', error);
       setError('Failed to select expert');
@@ -141,7 +134,7 @@ export default function Chat() {
   useEffect(() => {
     const checkInactivity = async () => {
       if (currentChat && !currentChat.problemResolved) {
-        const timeSinceLastActivity = Date.now() - currentChat.lastActivity.getTime();
+        const timeSinceLastActivity = Date.now() - new Date(currentChat.lastActivity).getTime();
 
         if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
           const inactivityMessage: Message = {
@@ -158,7 +151,6 @@ export default function Chat() {
 
           setChats((prev) => {
             const newChats = prev.map((chat) => (chat.id === currentChat.id ? updatedChat : chat));
-            localStorage.setItem('chats', JSON.stringify(newChats));
             return newChats;
           });
           setCurrentChat(updatedChat);
@@ -289,7 +281,6 @@ export default function Chat() {
       const updatedChats = prev.map((chat) =>
         chat.id === currentChat.id ? { ...chat, problemResolved: resolved } : chat
       );
-      localStorage.setItem('chats', JSON.stringify(updatedChats));
       return updatedChats;
     });
   };
@@ -303,7 +294,10 @@ export default function Chat() {
   }, [message]);
 
   const handleNewChat = () => {
-    router.push('/new-chat');
+    // Отображаем компонент ExpertSelector
+    setShowExpertSelector(true);
+    // Очищаем текущий чат
+    setCurrentChat(null);
   };
 
   return (
@@ -337,7 +331,10 @@ export default function Chat() {
               className={`p-3 cursor-pointer rounded-lg hover:bg-[#2A2B32] flex items-center gap-2 ${
                 currentChat?.id === chat.id ? 'bg-[#2A2B32]' : ''
               }`}
-              onClick={() => setCurrentChat(chat)}
+              onClick={() => {
+                setCurrentChat(chat);
+                setShowExpertSelector(false);
+              }}
             >
               <svg
                 width="16"
@@ -359,11 +356,22 @@ export default function Chat() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col bg-[#343541]">
-        {selectedExpert ? (
+        {showExpertSelector ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="max-w-4xl mx-auto px-4">
+              <h1 className="text-2xl font-bold mb-8 text-center text-white">
+                Выберите эксперта для нового чата
+              </h1>
+              <div className="mb-4">
+                <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
+              </div>
+            </div>
+          </div>
+        ) : selectedExpert && currentChat ? (
           <>
             <ScrollArea className="flex-1 p-4">
               <div className="max-w-3xl mx-auto">
-                {currentChat?.messages?.map((msg, index) => (
+                {currentChat.messages.map((msg, index) => (
                   <div
                     key={index}
                     className={`py-6 ${
@@ -522,16 +530,8 @@ export default function Chat() {
             </div>
           </>
         ) : (
-          <div className="min-h-screen bg-gray-50 py-8">
-            <div className="max-w-4xl mx-auto px-4">
-              <h1 className="text-2xl font-bold mb-8 text-center">
-                Выберите эксперта для нового чата
-              </h1>
-
-              <div className="mb-4">
-                <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
-              </div>
-            </div>
+          <div className="flex-1 flex items-center justify-center text-white">
+            Выберите чат или начните новый
           </div>
         )}
       </div>
