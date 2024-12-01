@@ -10,14 +10,12 @@ interface Message {
 
 interface DbChat {
   id: string;
-  expert_id: string;
-  browser_id: string;
+  expertId: string;
+  browserId: string;
   title: string;
-  messages: string;
-  created_at: Date;
-  updated_at: Date;
-  last_activity: Date;
-  problem_resolved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  lastActivity: Date;
 }
 
 interface Chat {
@@ -29,20 +27,17 @@ interface Chat {
   createdAt: Date;
   updatedAt: Date;
   lastActivity: Date;
-  problemResolved: boolean;
 }
 
 function mapDbChatToChat(dbChat: DbChat): Chat {
   return {
     id: dbChat.id,
-    expertId: dbChat.expert_id,
-    browserId: dbChat.browser_id,
+    expertId: dbChat.expertId,
+    browserId: dbChat.browserId,
     title: dbChat.title,
-    messages: JSON.parse(dbChat.messages),
-    createdAt: dbChat.created_at,
-    updatedAt: dbChat.updated_at,
-    lastActivity: dbChat.last_activity,
-    problemResolved: dbChat.problem_resolved
+    createdAt: dbChat.createdAt,
+    updatedAt: dbChat.updatedAt,
+    lastActivity: dbChat.lastActivity
   };
 }
 
@@ -55,26 +50,34 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Browser ID is required' }, { status: 400 });
     }
 
-    const chats = await prisma.$queryRaw<DbChat[]>`
-      SELECT 
-        id, 
-        "expertId" as expert_id,
-        "browserId" as browser_id,
-        title,
-        messages::text as messages,
-        "createdAt" as created_at,
-        "updatedAt" as updated_at,
-        "lastActivity" as last_activity,
-        "problemResolved" as problem_resolved
-      FROM chats 
-      WHERE "browserId" = ${browserId}
-      ORDER BY "lastActivity" DESC
-    `;
+    const chats = await prisma.chat.findMany({
+      where: {
+        browserId: browserId
+      },
+      include: {
+        messages: true
+      },
+      orderBy: {
+        lastActivity: 'desc'
+      }
+    });
     
-    // Parse messages JSON for each chat
-    const parsedChats = chats.map(mapDbChatToChat);
+    const formattedChats = chats.map(chat => ({
+      id: chat.id,
+      expertId: chat.expertId,
+      browserId: chat.browserId,
+      title: chat.title,
+      messages: chat.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.createdAt.getTime()
+      })),
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      lastActivity: chat.lastActivity
+    }));
 
-    return NextResponse.json(parsedChats);
+    return NextResponse.json(formattedChats);
   } catch (error) {
     console.error('Error fetching chats:', error);
     return NextResponse.json({ error: 'Failed to fetch chats' }, { status: 500 });
@@ -85,47 +88,35 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    if (!body.browserId) {
-      return NextResponse.json({ error: 'Browser ID is required' }, { status: 400 });
+    if (!body.browserId || !body.expertId) {
+      return NextResponse.json({ error: 'Browser ID and Expert ID are required' }, { status: 400 });
     }
 
-    const chat = await prisma.$queryRaw<DbChat[]>`
-      INSERT INTO chats (
-        id,
-        expert_id,
-        browser_id,
-        title,
-        messages,
-        created_at,
-        updated_at,
-        last_activity,
-        problem_resolved
-      ) VALUES (
-        ${randomUUID()},
-        ${body.expertId},
-        ${body.browserId},
-        ${body.title},
-        ${JSON.stringify(body.messages)}::json,
-        NOW(),
-        NOW(),
-        NOW(),
-        false
-      )
-      RETURNING 
-        id, 
-        expert_id,
-        browser_id,
-        title,
-        messages::text as messages,
-        created_at,
-        updated_at,
-        last_activity,
-        problem_resolved
-    `;
+    const chat = await prisma.chat.create({
+      data: {
+        expert: {
+          connect: {
+            id: body.expertId
+          }
+        },
+        browserId: body.browserId,
+        title: body.title || ''
+      },
+      include: {
+        messages: true
+      }
+    });
 
-    const parsedChat = mapDbChatToChat(chat[0]);
-
-    return NextResponse.json(parsedChat);
+    return NextResponse.json({
+      id: chat.id,
+      expertId: chat.expertId,
+      browserId: chat.browserId,
+      title: chat.title,
+      messages: [],
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      lastActivity: chat.lastActivity
+    });
   } catch (error) {
     console.error('Error creating chat:', error);
     return NextResponse.json({ error: 'Failed to create chat' }, { status: 500 });
@@ -136,32 +127,67 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     
-    if (!body.id || !body.browserId) {
-      return NextResponse.json({ error: 'Chat ID and Browser ID are required' }, { status: 400 });
+    if (!body.id || !Array.isArray(body.messages)) {
+      return NextResponse.json({ error: 'Chat ID and messages array are required' }, { status: 400 });
     }
 
-    const chat = await prisma.$queryRaw<DbChat[]>`
-      UPDATE chats 
-      SET 
-        messages = ${JSON.stringify(body.messages)}::json,
-        last_activity = NOW(),
-        updated_at = NOW()
-      WHERE id = ${body.id} AND browser_id = ${body.browserId}
-      RETURNING 
-        id, 
-        expert_id,
-        browser_id,
-        title,
-        messages::text as messages,
-        created_at,
-        updated_at,
-        last_activity,
-        problem_resolved
-    `;
+    // Update chat's last activity
+    const chat = await prisma.chat.update({
+      where: {
+        id: body.id
+      },
+      data: {
+        title: body.title,
+        lastActivity: new Date()
+      }
+    });
 
-    const parsedChat = mapDbChatToChat(chat[0]);
+    // Delete existing messages
+    await prisma.message.deleteMany({
+      where: {
+        chatId: body.id
+      }
+    });
 
-    return NextResponse.json(parsedChat);
+    // Create new messages
+    if (body.messages.length > 0) {
+      await prisma.message.createMany({
+        data: body.messages.map((msg: Message) => ({
+          chatId: body.id,
+          role: msg.role,
+          content: msg.content
+        }))
+      });
+    }
+
+    // Fetch updated chat with messages
+    const updatedChat = await prisma.chat.findUnique({
+      where: {
+        id: body.id
+      },
+      include: {
+        messages: true
+      }
+    });
+
+    if (!updatedChat) {
+      throw new Error('Failed to fetch updated chat');
+    }
+
+    return NextResponse.json({
+      id: updatedChat.id,
+      expertId: updatedChat.expertId,
+      browserId: updatedChat.browserId,
+      title: updatedChat.title,
+      messages: updatedChat.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.createdAt.getTime()
+      })),
+      createdAt: updatedChat.createdAt,
+      updatedAt: updatedChat.updatedAt,
+      lastActivity: updatedChat.lastActivity
+    });
   } catch (error) {
     console.error('Error updating chat:', error);
     return NextResponse.json({ error: 'Failed to update chat' }, { status: 500 });
