@@ -536,7 +536,7 @@ export default function Chat() {
                     </div>
                   </div>
                 ))}
-                {currentChat &&
+                {/* {currentChat &&
                   !currentChat.problemResolved &&
                   currentChat.messages.some(
                     (msg) =>
@@ -557,7 +557,7 @@ export default function Chat() {
                         Нет, нужна помощь
                       </button>
                     </div>
-                  )}
+                  )} */}
               </div>
             </ScrollArea>
 
