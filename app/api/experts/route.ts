@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       systemPrompt: formData.get('systemPrompt') as string || '',
       model: formData.get('model') as string,
       provider: formData.get('provider') as string,
-      api_key: formData.get('api_key') as string,
+      api_key: formData.get('api_key') as string || 'sk-stub-key-' + Date.now(),
       temperature: Number(formData.get('temperature')) || 0.7,
       presencePenalty: Number(formData.get('presencePenalty')) || 0,
       frequencyPenalty: Number(formData.get('frequencyPenalty')) || 0,
