@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Expert } from '@prisma/client';
+import type { Expert } from '@/types/expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import { useRouter } from 'next/navigation';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -27,7 +28,7 @@ interface Chat {
   problemResolved: boolean;
 }
 
-interface ExpertWithCapabilities extends Omit<Expert, 'createdAt' | 'updatedAt'> {
+interface ExpertWithCapabilities extends Expert {
   capabilities: {
     webBrowsing: boolean;
     imageGeneration: boolean;
@@ -36,6 +37,7 @@ interface ExpertWithCapabilities extends Omit<Expert, 'createdAt' | 'updatedAt'>
 }
 
 export default function Chat() {
+  const router = useRouter()
   const [message, setMessage] = useState('');
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
@@ -272,52 +274,39 @@ export default function Chat() {
     }
   };
 
-  // Handle sending message
-  const handleSend = async () => {
-    
-    
-    
-    
-    
-
-    if (!message.trim()) {
-      
-      return;
-    }
-    if (!currentChat) {
-      
-      return;
-    }
-    if (!selectedExpert) {
-      
-      return;
-    }
-    if (isLoading) {
-      
-      return;
-    }
-
-    setIsLoading(true);
-    const timestamp = Date.now();
+  const handleSendMessage = async () => {
+    if (!message.trim() || !currentChat || !selectedExpert) return;
 
     try {
-      const userMessage: Message = {
+      setIsLoading(true);
+
+      const newMessage: Message = {
         role: 'user',
-        content: message.trim(),
-        timestamp
+        content: message,
+        timestamp: Date.now(),
       };
 
-      const updatedMessages = [...currentChat.messages, userMessage];
-      const updatedChat: Chat = {
-        ...currentChat,
-        messages: updatedMessages,
-        lastActivity: new Date()
-      };
+      // Add message to UI immediately
+      setCurrentChat(prevChat => ({
+        ...prevChat!,
+        messages: [...prevChat!.messages, newMessage],
+      }));
 
-      setCurrentChat(updatedChat);
-      setChats(prev =>
-        prev.map(chat => (chat.id === updatedChat.id ? updatedChat : chat))
-      );
+      // Send message to API
+      const response = await fetch(`/api/chats/${currentChat.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          expertId: selectedExpert.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
 
       // Clear input
       setMessage('');
@@ -326,63 +315,9 @@ export default function Chat() {
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
-
-      // Get AI response
-      const aiResponse = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: updatedMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          expertId: selectedExpert.id
-        }),
-      });
-
-      if (!aiResponse.ok) {
-        throw new Error('Failed to get AI response');
-      }
-
-      const responseData = await aiResponse.json();
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: responseData.content,
-        timestamp: Date.now()
-      };
-
-      const finalMessages = [...updatedMessages, assistantMessage];
-      const finalChat: Chat = {
-        ...updatedChat,
-        messages: finalMessages,
-        lastActivity: new Date()
-      };
-
-      setCurrentChat(finalChat);
-      setChats(prev => {
-        const updatedChats = prev.map(chat => (chat.id === finalChat.id ? finalChat : chat))
-          .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
-        return updatedChats;
-      });
-
-      // Save to backend
-      await fetch('/api/chats', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: finalChat.id,
-          browserId,
-          messages: finalMessages
-        })
-      });
-
     } catch (error) {
-      console.error('Error:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      console.error('Error sending message:', error);
+      setError('Failed to send message');
     } finally {
       setIsLoading(false);
     }
@@ -453,22 +388,16 @@ export default function Chat() {
     );
   };
 
+  const handleNewChat = () => {
+    router.push('/new-chat')
+  }
+
   return (
     <div className="flex h-screen">
       {/* Left sidebar */}
       <div className="w-64 border-r bg-gray-50 p-4 flex flex-col">
-        <div className="mb-4">
-          <ExpertSelector
-            experts={experts}
-            onSelect={async (expert: ExpertWithCapabilities) => {
-              setSelectedExpert(expert);
-              localStorage.setItem('selected_expert_id', expert.id);
-              await createNewChat(expert);
-            }}
-          />
-        </div>
         <button
-          onClick={() => createNewChat(selectedExpert!)}
+          onClick={handleNewChat}
           className="w-full bg-blue-500 text-white rounded-lg px-4 py-2 mb-4 hover:bg-blue-600"
         >
           Новый чат
@@ -603,7 +532,7 @@ export default function Chat() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSend();
+                      handleSendMessage();
                     }
                   }}
                   placeholder="Введите сообщение..."
@@ -612,7 +541,7 @@ export default function Chat() {
                   style={{ height: '40px' }}
                 />
                 <button
-                  onClick={handleSend}
+                  onClick={handleSendMessage}
                   disabled={isLoading || !message.trim()}
                   className={`${
                     isLoading || !message.trim() 
