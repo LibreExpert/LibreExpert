@@ -19,10 +19,13 @@ export default function NewChatPage() {
     }
   }, [])
 
+  function generateBrowserId() {
+    return 'browser_' + Math.random().toString(36).substring(2) + Date.now().toString(36)
+  }
+
   const handleExpertSelect = async (expert: Expert) => {
     if (!browserId) {
-      setError('Browser ID not found')
-      return
+      setBrowserId(generateBrowserId())
     }
 
     try {

@@ -393,111 +393,108 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex h-screen">
-      {/* Left sidebar */}
-      <div className="w-64 border-r bg-gray-50 p-4 flex flex-col">
+    <div className="flex h-screen bg-[#343541]">
+      {/* Sidebar */}
+      <div className="w-64 bg-[#202123] text-white p-2 flex flex-col">
         <button
-          onClick={handleNewChat}
-          className="w-full bg-blue-500 text-white rounded-lg px-4 py-2 mb-4 hover:bg-blue-600"
+          onClick={() => router.push('/new-chat')}
+          className="w-full bg-transparent hover:bg-[#2A2B32] border border-[#565869] text-white rounded-lg px-4 py-2 mb-4 flex items-center gap-2"
         >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 4L12 20M20 12L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
           Новый чат
         </button>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto space-y-2">
           {chats.map((chat) => (
             <div
               key={chat.id}
-              className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                currentChat?.id === chat.id ? 'bg-blue-100' : ''
+              className={`p-3 cursor-pointer rounded-lg hover:bg-[#2A2B32] flex items-center gap-2 ${
+                currentChat?.id === chat.id ? 'bg-[#2A2B32]' : ''
               }`}
               onClick={() => setCurrentChat(chat)}
             >
-              <div className="font-medium truncate">{chat.title}</div>
-              <div className="text-sm text-gray-500">
-                {chat.createdAt.toLocaleString()}
-              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="currentColor"/>
+              </svg>
+              <div className="flex-1 truncate text-sm">{chat.title}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col">
-        {selectedExpert && (
+      <div className="flex-1 flex flex-col bg-[#343541]">
+        {selectedExpert ? (
           <>
-            <div className="border-b p-4">
-              <h2 className="text-lg font-semibold">{selectedExpert.name}</h2>
-              <p className="text-sm text-gray-600">{selectedExpert.description}</p>
-            </div>
             <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
+              <div className="max-w-3xl mx-auto">
                 {currentChat?.messages?.map((msg, index) => (
                   <div
                     key={index}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+                    className={`py-6 ${msg.role === 'assistant' ? 'bg-[#444654]' : ''} -mx-4 px-4`}
                   >
-                    <div
-                      className={`p-4 rounded-lg relative ${
-                        msg.role === 'user'
-                          ? 'bg-blue-100'
-                          : 'bg-gray-100'
-                      }`}
-                    >
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight]}
-                        className="prose prose-sm max-w-none dark:prose-invert"
-                        components={{
-                          pre: ({ children, ...props }) => {
-                            const codeElement = React.Children.toArray(children).find(
-                              (child): child is React.ReactElement => 
-                                React.isValidElement(child) && child.type === 'code'
-                            );
-                             
-                            return (
+                    <div className="max-w-3xl mx-auto flex gap-4">
+                      <div className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0">
+                        {msg.role === 'assistant' ? (
+                          <div className="bg-[#10a37f] rounded-sm w-full h-full flex items-center justify-center text-white">
+                            AI
+                          </div>
+                        ) : (
+                          <div className="bg-[#7C7C8A] rounded-sm w-full h-full flex items-center justify-center text-white">
+                            U
+                          </div>
+                        )}
+                      </div>
+                      <div className="prose prose-invert flex-1">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                          components={{
+                            pre: ({ children, ...props }) => (
                               <div className="relative group">
-                                <pre {...props} className="bg-gray-900 p-4 rounded-lg overflow-x-auto">
+                                <pre {...props} className="bg-[#1E1E1E] p-4 rounded-lg overflow-x-auto">
                                   {children}
                                 </pre>
                                 <button
                                   onClick={() => {
+                                    const codeElement = React.Children.toArray(children).find(
+                                      (child): child is React.ReactElement => 
+                                        React.isValidElement(child) && child.type === 'code'
+                                    );
                                     if (codeElement && typeof codeElement.props.children === 'string') {
                                       navigator.clipboard.writeText(codeElement.props.children);
                                     }
                                   }}
-                                  className="absolute top-2 right-2 bg-gray-700 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute top-2 right-2 bg-[#2A2B32] text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   Copy
                                 </button>
                               </div>
-                            );
-                          },
-                          code: ({ className, children, ...props }) => {
-                            const match = /language-(\w+)/.exec(className || '');
-                            return match ? (
-                              <code {...props} className={className}>
+                            ),
+                            code: ({ className, children, ...props }) => {
+                              const match = /language-(\w+)/.exec(className || '');
+                              return match ? (
+                                <code {...props} className={className}>
+                                  {children}
+                                </code>
+                              ) : (
+                                <code {...props} className="bg-[#2A2B32] px-1 py-0.5 rounded">
+                                  {children}
+                                </code>
+                              );
+                            },
+                            p: ({ children }) => <p className="text-white mb-4 last:mb-0">{children}</p>,
+                            a: ({ children, href }) => (
+                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#10a37f] hover:underline">
                                 {children}
-                              </code>
-                            ) : (
-                              <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">
-                                {children}
-                              </code>
-                            );
-                          },
-                          p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
-                          a: ({ children, href }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                              {children}
-                            </a>
-                          ),
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                      {msg.timestamp && (
-                        <div className={`text-[10px] text-gray-400 mt-1 leading-none ${msg.role === 'assistant' ? 'text-right' : ''}`}>
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      )}
+                              </a>
+                            ),
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -505,16 +502,16 @@ export default function Chat() {
                   msg.role === 'assistant' && 
                   msg.content.includes('Удалось ли решить вашу проблему?') && 
                   !currentChat.problemResolved && (
-                    <div key={index} className="mt-2 flex space-x-2">
+                    <div key={`resolution-${index}`} className="mt-2 flex justify-center space-x-2">
                       <button
                         onClick={() => handleProblemResolution(true)}
-                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                        className="px-3 py-1 bg-[#10a37f] text-white rounded hover:bg-[#0d926f] transition-colors"
                       >
                         Да, решено
                       </button>
                       <button
                         onClick={() => handleProblemResolution(false)}
-                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        className="px-3 py-1 bg-[#2A2B32] text-white rounded hover:bg-[#444654] transition-colors"
                       >
                         Нет, нужна помощь
                       </button>
@@ -523,8 +520,10 @@ export default function Chat() {
                 ))}
               </div>
             </ScrollArea>
-            <div className="border-t border-gray-200 p-4">
-              <div className="flex space-x-4">
+            
+            {/* Message input */}
+            <div className="border-t border-[#2A2B32] p-4">
+              <div className="max-w-3xl mx-auto relative">
                 <textarea
                   ref={textareaRef}
                   value={message}
@@ -536,24 +535,27 @@ export default function Chat() {
                     }
                   }}
                   placeholder="Введите сообщение..."
-                  className="flex-1 resize-none border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-[#40414F] text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-[#10a37f] resize-none"
                   rows={1}
-                  style={{ height: '40px' }}
+                  style={{ minHeight: '44px', maxHeight: '200px' }}
                 />
                 <button
                   onClick={handleSendMessage}
                   disabled={isLoading || !message.trim()}
-                  className={`${
-                    isLoading || !message.trim() 
-                      ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-blue-500 hover:bg-blue-600'
-                  } text-white rounded-lg px-6 py-2`}
+                  className="absolute right-2 bottom-1.5 p-2 text-white disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? 'Отправка...' : 'Отправить'}
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" 
+                    className={message.trim() ? 'text-[#10a37f]' : 'text-gray-400'}>
+                    <path d="M7 11L12 6M12 6L17 11M12 6V20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" transform="rotate(90 12 12)"/>
+                  </svg>
                 </button>
               </div>
             </div>
-          </> 
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-white">
+            Выберите чат или начните новый
+          </div>
         )}
       </div>
     </div>
