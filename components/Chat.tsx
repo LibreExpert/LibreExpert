@@ -61,6 +61,14 @@ export default function Chat() {
   // Constants
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 минут в миллисекундах
 
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  };
+
   const handleExpertSelect = async (expert: Expert) => {
     try {
       // Сохраняем выбранного эксперта
@@ -239,13 +247,13 @@ export default function Chat() {
       }));
 
       // Отправляем сообщение на API
-      const response = await fetch(`/api/chats/${currentChat.id}/messages`, {
+      const response = await fetch(`/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message,
+          messages: [...currentChat.messages, newMessage],
           expertId: selectedExpert.id,
         }),
       });
@@ -253,6 +261,19 @@ export default function Chat() {
       if (!response.ok) {
         throw new Error('Не удалось отправить сообщение');
       }
+
+      // Получаем ответ от ИИ
+      const aiResponse = await response.json();
+      
+      // Добавляем ответ ИИ в чат
+      setCurrentChat((prevChat) => ({
+        ...prevChat!,
+        messages: [...prevChat!.messages, {
+          role: aiResponse.role,
+          content: aiResponse.content,
+          timestamp: Date.now()
+        }],
+      }));
 
       // Очищаем поле ввода
       setMessage('');
@@ -283,10 +304,7 @@ export default function Chat() {
 
   // Автоизменение высоты текстового поля
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
+    adjustTextareaHeight();
   }, [message]);
 
   const handleNewChat = () => {
