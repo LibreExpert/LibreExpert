@@ -73,10 +73,10 @@ export function ExpertSelector({ onSelect, selectedExpertId }: ExpertSelectorPro
         {experts.map((expert) => (
           <div
             key={expert.id}
-            className={`p-4 rounded-lg transition-all ${
+            className={`p-4 rounded-lg transition-all border ${
               selectedExpertId === expert.id
-                ? 'bg-[#444654] text-[#FFFFFF]'
-                : 'bg-[#343541] text-[#FFFFFF] hover:bg-[#2A2B32]'
+                ? 'bg-[#444654] text-[#FFFFFF] border-[#10A37F]'
+                : 'bg-[#343541] text-[#FFFFFF] border-[#565869] hover:bg-[#2A2B32] hover:border-[#10A37F]'
             } ${isSelecting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-105'}`}
             onClick={async () => {
               if (isSelecting) return;

@@ -271,6 +271,22 @@ export default function Chat() {
       // Получаем ответ от ИИ
       const aiResponse = await response.json();
       
+      // Сохраняем обновленный чат на сервере
+      await fetch(`/api/chats`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: currentChat.id,
+          messages: [...currentChat.messages, newMessage, {
+            role: aiResponse.role,
+            content: aiResponse.content,
+            timestamp: Date.now()
+          }],
+        }),
+      });
+      
       // Добавляем ответ ИИ в чат
       setCurrentChat((prevChat) => ({
         ...prevChat!,
@@ -281,10 +297,8 @@ export default function Chat() {
         }],
       }));
 
-      // Скроллим вниз
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      // Очищаем поле ввода
+      setMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
       setError('Не удалось отправить сообщение');
