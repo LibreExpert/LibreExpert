@@ -166,6 +166,17 @@ export default function CreateAssistant({ initialConfig, onSave }: Props) {
       formData.append('name', newExpert.name);
       formData.append('description', newExpert.description);
       formData.append('systemPrompt', newExpert.systemPrompt);
+      formData.append('model', newExpert.model);
+      formData.append('provider', newExpert.provider);
+      formData.append('temperature', newExpert.temperature.toString());
+      formData.append('presencePenalty', newExpert.presence_penalty.toString());
+      formData.append('frequencyPenalty', newExpert.frequency_penalty.toString());
+      formData.append('topP', newExpert.top_p.toString());
+      
+      if (newExpert.api_key) {
+        formData.append('api_key', newExpert.api_key);
+      }
+
       files.forEach(file => {
         formData.append('files', file);
       });

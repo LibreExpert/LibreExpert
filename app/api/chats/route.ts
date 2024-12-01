@@ -58,17 +58,17 @@ export async function GET(request: Request) {
     const chats = await prisma.$queryRaw<DbChat[]>`
       SELECT 
         id, 
-        expert_id,
-        browser_id,
+        "expertId" as expert_id,
+        "browserId" as browser_id,
         title,
         messages::text as messages,
-        created_at,
-        updated_at,
-        last_activity,
-        problem_resolved
+        "createdAt" as created_at,
+        "updatedAt" as updated_at,
+        "lastActivity" as last_activity,
+        "problemResolved" as problem_resolved
       FROM chats 
-      WHERE browser_id = ${browserId}
-      ORDER BY last_activity DESC
+      WHERE "browserId" = ${browserId}
+      ORDER BY "lastActivity" DESC
     `;
     
     // Parse messages JSON for each chat

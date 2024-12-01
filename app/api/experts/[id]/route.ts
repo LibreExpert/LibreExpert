@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { DocumentService } from '@/services/document.service'
 
 interface RouteParams {
   params: {
@@ -36,43 +37,49 @@ export async function PUT(
   { params }: RouteParams
 ) {
   try {
-    const body = await request.json();
+    const formData = await request.formData();
     
-    // Создаем объект только с теми полями, которые были переданы
+    // Create update object from form data
     const updateData: any = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.description !== undefined) updateData.description = body.description;
-    if (body.systemPrompt !== undefined) updateData.systemPrompt = body.systemPrompt;
-    if (body.model !== undefined) updateData.model = body.model;
-    if (body.provider !== undefined) updateData.provider = body.provider;
-    if (body.api_key !== undefined) updateData.api_key = body.api_key;
-    if (body.temperature !== undefined) updateData.temperature = body.temperature;
-    if (body.presencePenalty !== undefined) updateData.presencePenalty = body.presencePenalty;
-    if (body.frequencyPenalty !== undefined) updateData.frequencyPenalty = body.frequencyPenalty;
-    if (body.topP !== undefined) updateData.topP = body.topP;
-    if (body.capabilities !== undefined) updateData.capabilities = body.capabilities;
+    
+    // Handle string fields
+    const stringFields = ['name', 'description', 'systemPrompt', 'model', 'provider', 'api_key'];
+    stringFields.forEach(field => {
+      const value = formData.get(field);
+      if (value !== null) {
+        updateData[field] = value;
+      }
+    });
 
+    // Handle numeric fields
+    const numericFields = ['temperature', 'presencePenalty', 'frequencyPenalty', 'topP'];
+    numericFields.forEach(field => {
+      const value = formData.get(field);
+      if (value !== null) {
+        updateData[field] = parseFloat(value as string);
+      }
+    });
+
+    // Update expert
     const expert = await prisma.expert.update({
       where: {
         id: params.id
       },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        systemPrompt: true,
-        model: true,
-        provider: true,
-        temperature: true,
-        presencePenalty: true,
-        frequencyPenalty: true,
-        topP: true,
-        capabilities: true,
-        createdAt: true,
-        updatedAt: true,
-      }
+      data: updateData
     });
+
+    // Handle file uploads if present
+    const files = formData.getAll('files');
+    if (files.length > 0 && updateData.api_key) {
+      const documentService = new DocumentService(updateData.api_key);
+
+      for (const file of files) {
+        if (file instanceof File) {
+          const content = await file.text();
+          await documentService.processDocument(expert.id, file.name, content);
+        }
+      }
+    }
 
     return NextResponse.json(expert);
   } catch (error) {
