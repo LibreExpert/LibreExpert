@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Expert } from '@prisma/client';
+import type { Expert } from '@/types/expert';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
-import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import { useRouter } from 'next/navigation';
+import { ExpertSelector } from '@/components/ExpertSelector';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -27,159 +28,136 @@ interface Chat {
   problemResolved: boolean;
 }
 
-interface ExpertWithCapabilities extends Omit<Expert, 'createdAt' | 'updatedAt'> {
-  capabilities: {
-    webBrowsing: boolean;
-    imageGeneration: boolean;
-    codeInterpreter: boolean;
-  };
+// Функция для генерации UUID v4
+function generateUUID() {
+  let d = new Date().getTime();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (d + Math.random() * 16) % 16 | 0;
+    d = Math.floor(d / 16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 }
 
 export default function Chat() {
+  const router = useRouter();
   const [message, setMessage] = useState('');
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
-  const [selectedExpert, setSelectedExpert] = useState<ExpertWithCapabilities | null>(null);
+  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [browserId, setBrowserId] = useState<string>('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [experts, setExperts] = useState<ExpertWithCapabilities[]>([]);
+  const [experts, setExperts] = useState<Expert[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Constants
-  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 минут в миллисекундах
 
-  // Initialize browserId
+  // Инициализация browserId
   useEffect(() => {
     let id = localStorage.getItem('browserId');
     if (!id) {
-      id = window.crypto.randomUUID();
+      id = generateUUID();
       localStorage.setItem('browserId', id);
     }
     setBrowserId(id);
   }, []);
 
-  // Load experts from backend
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  };
+
+  const handleExpertSelect = async (expert: Expert) => {
+    try {
+      // Сохраняем выбранного эксперта
+      localStorage.setItem('selected_expert_id', expert.id);
+      setSelectedExpert(expert);
+
+      // Создаем новый чат с выбранным экспертом
+      await createNewChat(expert);
+    } catch (error) {
+      console.error('Error selecting expert:', error);
+      setError('Не удалось выбрать эксперта');
+    }
+  };
+
+  // Загрузка экспертов с бэкенда
   useEffect(() => {
     const loadExperts = async () => {
       try {
-        setLoading(true);
         const response = await fetch('/api/experts');
-        if (!response.ok) throw new Error('Failed to fetch experts');
+        if (!response.ok) throw new Error('Не удалось получить список экспертов');
         const data = await response.json();
-        
-        const expertsWithCapabilities: ExpertWithCapabilities[] = data.map((expert: Expert) => ({
-          ...expert,
-          capabilities: {
-            webBrowsing: false,
-            imageGeneration: false,
-            codeInterpreter: false
-          }
-        }));
-        
-        setExperts(expertsWithCapabilities);
 
-        // Set selected expert from localStorage or first expert
-        const savedExpertId = localStorage.getItem('selected_expert_id');
-        const expert = savedExpertId 
-          ? expertsWithCapabilities.find(e => e.id === savedExpertId)
-          : expertsWithCapabilities[0];
-          
-        if (expert && browserId) {
-          setSelectedExpert(expert);
-          // Создаем новый чат для выбранного эксперта, если нет текущего чата
-          if (!currentChat) {
-            createNewChat(expert);
-          }
-        }
+        setExperts(data);
       } catch (error) {
         console.error('Error loading experts:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load experts');
-      } finally {
-        setLoading(false);
+        setError(error instanceof Error ? error.message : 'Не удалось загрузить экспертов');
       }
     };
 
-    if (browserId) {
-      loadExperts();
-    }
-  }, [browserId, currentChat]);
+    loadExperts();
+  }, []);
 
-  // Load chats from backend
+  // Загрузка чатов с бэкенда
   useEffect(() => {
     const loadChats = async () => {
-      if (!browserId) return;
-
       try {
-        setLoading(true);
         const response = await fetch(`/api/chats?browserId=${browserId}`);
-        if (!response.ok) throw new Error('Failed to fetch chats');
+        if (!response.ok) throw new Error('Не удалось получить список чатов');
         const data = await response.json();
-        
-        // Сортируем чаты по lastActivity в порядке убывания
-        const sortedChats = data.sort((a: Chat, b: Chat) => 
-          new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+
+        // Сортируем чаты по дате последней активности в порядке убывания
+        const sortedChats = data.sort(
+          (a: Chat, b: Chat) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
         );
-        
+
         setChats(sortedChats);
-        
+
         // Если есть сохраненный ID чата, выбираем его
         const savedChatId = localStorage.getItem('selected_chat_id');
-        if (savedChatId) {
-          const savedChat = sortedChats.find((chat: Chat) => chat.id === savedChatId);
-          if (savedChat) {
-            setCurrentChat(savedChat);
-          }
+        const savedChat = savedChatId
+          ? sortedChats.find((chat: Chat) => chat.id === savedChatId)
+          : sortedChats[0];
+
+        if (savedChat) {
+          setCurrentChat(savedChat);
         }
       } catch (error) {
         console.error('Error loading chats:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load chats');
-      } finally {
-        setLoading(false);
+        setError(error instanceof Error ? error.message : 'Не удалось загрузить чаты');
       }
     };
 
     loadChats();
   }, [browserId]);
 
-  // Load saved API keys on mount
-  useEffect(() => {
-    const savedOpenAIKey = localStorage.getItem('openai_api_key');
-    const savedGeminiKey = localStorage.getItem('gemini_api_key');
-
-    if (selectedExpert) {
-      const key = selectedExpert.provider === 'openai' ? savedOpenAIKey : savedGeminiKey;
-      if (key) {
-        // setApiKey(key);
-      }
-    }
-  }, [selectedExpert?.provider]);
-
-  // Check for inactivity
+  // Проверка на бездействие
   useEffect(() => {
     const checkInactivity = async () => {
       if (currentChat && !currentChat.problemResolved) {
-        const timeSinceLastActivity = Date.now() - currentChat.lastActivity.getTime();
-        
+        const timeSinceLastActivity = Date.now() - new Date(currentChat.lastActivity).getTime();
+
         if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
           const inactivityMessage: Message = {
             role: 'assistant',
-            content: 'Я заметил, что прошло некоторое время с нашего последнего взаимодействия. Удалось ли решить вашу проблему? Если нет, я готов продолжить помогать.',
-            timestamp: Date.now()
+            content:
+              'Я заметил, что прошло некоторое время с нашего последнего взаимодействия. Удалось ли решить вашу проблему? Если нет, я готов продолжить помогать.',
+            timestamp: Date.now(),
           };
 
           const updatedChat = {
             ...currentChat,
-            messages: [...currentChat.messages, inactivityMessage]
+            messages: [...currentChat.messages, inactivityMessage],
           };
 
-          setChats(prev => {
-            const newChats = prev.map(chat => 
-              chat.id === currentChat.id ? updatedChat : chat
-            );
-            localStorage.setItem('chats', JSON.stringify(newChats));
+          setChats((prev) => {
+            const newChats = prev.map((chat) => (chat.id === currentChat.id ? updatedChat : chat));
             return newChats;
           });
           setCurrentChat(updatedChat);
@@ -187,42 +165,32 @@ export default function Chat() {
       }
     };
 
-    // Clear existing timeout
+    // Очистка предыдущего таймера
     if (inactivityTimeoutRef.current) {
       clearTimeout(inactivityTimeoutRef.current);
     }
 
-    // Set new timeout
+    // Установка нового таймера
     if (currentChat && !currentChat.problemResolved) {
       inactivityTimeoutRef.current = setTimeout(checkInactivity, INACTIVITY_TIMEOUT);
     }
 
-    // Cleanup
+    // Очистка при размонтировании
     return () => {
       if (inactivityTimeoutRef.current) {
         clearTimeout(inactivityTimeoutRef.current);
       }
     };
-  }, [currentChat, INACTIVITY_TIMEOUT]);
+  }, [currentChat]);
 
-  // Format chat title
-  const formatChatTitle = (content: string) => {
-    return content.length > 50 ? content.slice(0, 50) + '...' : content;
-  };
-
-  // Create new chat
-  const createNewChat = async (expert: ExpertWithCapabilities) => {
-    
-    
-    
-
-    if (!expert || !browserId) {
-      
+  // Создание нового чата
+  const createNewChat = async (expert: Expert) => {
+    if (!expert) {
       return;
     }
 
     const newChat: Chat = {
-      id: window.crypto.randomUUID(),
+      id: generateUUID(),
       expertId: expert.id,
       browserId: browserId,
       messages: [],
@@ -230,403 +198,428 @@ export default function Chat() {
       updatedAt: new Date(),
       title: `Чат с ${expert.name} ${new Date().toLocaleString()}`,
       lastActivity: new Date(),
-      problemResolved: false
+      problemResolved: false,
     };
 
-    
-
     try {
-      // Save to backend first
+      // Сохранение на бэкенде
       const response = await fetch('/api/chats', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          id: newChat.id,
-          expertId: newChat.expertId,
-          browserId: newChat.browserId,
-          title: newChat.title,
-          messages: newChat.messages
-        }),
+        body: JSON.stringify(newChat),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create chat on backend');
+        throw new Error('Не удалось создать чат на бэкенде');
       }
 
       const savedChat = await response.json();
-      
 
-      // Update local state only after successful backend save
-      setChats(prev => {
-        const updatedChats = [...prev, savedChat].sort((a, b) => 
-          new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+      // Обновляем локальное состояние после успешного сохранения на бэкенде
+      setChats((prev) => {
+        const updatedChats = [...prev, savedChat].sort(
+          (a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
         );
         return updatedChats;
       });
       setCurrentChat(savedChat);
     } catch (error) {
       console.error('Error creating chat:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create chat');
+      setError(error instanceof Error ? error.message : 'Не удалось создать чат');
     }
   };
 
-  // Handle sending message
-  const handleSend = async () => {
-    
-    
-    
-    
-    
-
-    if (!message.trim()) {
-      
-      return;
-    }
-    if (!currentChat) {
-      
-      return;
-    }
-    if (!selectedExpert) {
-      
-      return;
-    }
-    if (isLoading) {
-      
-      return;
-    }
-
-    setIsLoading(true);
-    const timestamp = Date.now();
+  const handleSendMessage = async () => {
+    if (!message.trim() || !currentChat || !selectedExpert) return;
 
     try {
-      const userMessage: Message = {
+      setIsLoading(true);
+
+      const newMessage: Message = {
         role: 'user',
-        content: message.trim(),
-        timestamp
+        content: message,
+        timestamp: Date.now(),
       };
 
-      const updatedMessages = [...currentChat.messages, userMessage];
-      const updatedChat: Chat = {
-        ...currentChat,
-        messages: updatedMessages,
-        lastActivity: new Date()
-      };
-
-      setCurrentChat(updatedChat);
-      setChats(prev =>
-        prev.map(chat => (chat.id === updatedChat.id ? updatedChat : chat))
-      );
-
-      // Clear input
+      // Очищаем поле ввода сразу после создания сообщения
       setMessage('');
-
-      // Scroll to bottom
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
 
-      // Get AI response
-      const aiResponse = await fetch('/api/chat', {
+      // Добавляем сообщение в UI сразу
+      setCurrentChat((prevChat) => ({
+        ...prevChat!,
+        messages: [...prevChat!.messages, newMessage],
+      }));
+
+      // Отправляем сообщение на API
+      const response = await fetch(`/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: updatedMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          expertId: selectedExpert.id
+          messages: [...currentChat.messages, newMessage],
+          expertId: selectedExpert.id,
         }),
       });
 
-      if (!aiResponse.ok) {
-        throw new Error('Failed to get AI response');
+      if (!response.ok) {
+        throw new Error('Не удалось отправить сообщение');
       }
 
-      const responseData = await aiResponse.json();
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: responseData.content,
-        timestamp: Date.now()
-      };
-
-      const finalMessages = [...updatedMessages, assistantMessage];
-      const finalChat: Chat = {
-        ...updatedChat,
-        messages: finalMessages,
-        lastActivity: new Date()
-      };
-
-      setCurrentChat(finalChat);
-      setChats(prev => {
-        const updatedChats = prev.map(chat => (chat.id === finalChat.id ? finalChat : chat))
-          .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
-        return updatedChats;
-      });
-
-      // Save to backend
-      await fetch('/api/chats', {
+      // Получаем ответ от ИИ
+      const aiResponse = await response.json();
+      
+      // Сохраняем обновленный чат на сервере
+      await fetch(`/api/chats`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: finalChat.id,
-          browserId,
-          messages: finalMessages
-        })
+          id: currentChat.id,
+          messages: [...currentChat.messages, newMessage, {
+            role: aiResponse.role,
+            content: aiResponse.content,
+            timestamp: Date.now()
+          }],
+        }),
       });
+      
+      // Добавляем ответ ИИ в чат
+      setCurrentChat((prevChat) => ({
+        ...prevChat!,
+        messages: [...prevChat!.messages, {
+          role: aiResponse.role,
+          content: aiResponse.content,
+          timestamp: Date.now()
+        }],
+      }));
 
+      // Очищаем поле ввода
+      setMessage('');
     } catch (error) {
-      console.error('Error:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      console.error('Error sending message:', error);
+      setError('Не удалось отправить сообщение');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle problem resolution response
+  // Обработка ответа на вопрос о решении проблемы
   const handleProblemResolution = async (resolved: boolean) => {
     if (!currentChat) return;
-    
-    setChats(prev => {
-      const updatedChats = prev.map(chat => 
-        chat.id === currentChat.id 
-          ? { ...chat, problemResolved: resolved }
-          : chat
+
+    setChats((prev) => {
+      const updatedChats = prev.map((chat) =>
+        chat.id === currentChat.id ? { ...chat, problemResolved: resolved } : chat
       );
-      localStorage.setItem('chats', JSON.stringify(updatedChats));
       return updatedChats;
     });
   };
 
-  // Auto-adjust textarea height
+  // Автоизменение высоты текстового поля
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
+    adjustTextareaHeight();
   }, [message]);
 
-  // Expert selector component
-  const ExpertSelector = ({ experts, onSelect }: { 
-    experts: ExpertWithCapabilities[], 
-    onSelect: (expert: ExpertWithCapabilities) => void 
-  }) => {
-    return (
-      <div className="flex flex-wrap gap-4 p-4">
-        {experts.map((expert) => (
-          <button
-            key={expert.id}
-            onClick={() => onSelect(expert)}
-            className={`flex-1 min-w-[200px] p-4 rounded-lg border-2 transition-all ${
-              selectedExpert?.id === expert.id
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-blue-300'
-            }`}
-          >
-            <h3 className="font-medium text-lg mb-2">{expert.name}</h3>
-            <p className="text-gray-600 text-sm">{expert.description}</p>
-            <div className="mt-2 flex gap-2">
-              {expert.capabilities.webBrowsing && (
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  Веб-поиск
-                </span>
-              )}
-              {expert.capabilities.imageGeneration && (
-                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                  Генерация изображений
-                </span>
-              )}
-              {expert.capabilities.codeInterpreter && (
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  Интерпретатор кода
-                </span>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
-    );
+  const handleNewChat = () => {
+    // Очищаем текущий чат и выбранного эксперта
+    setCurrentChat(null);
+    setSelectedExpert(null);
+    setMessage('');
+    localStorage.removeItem('selected_chat_id');
+  };
+
+  const handleChatSelect = (chat: Chat) => {
+    setCurrentChat(chat);
+    // Устанавливаем выбранного эксперта для чата
+    const expert = experts.find((e) => e.id === chat.expertId);
+    if (expert) {
+      setSelectedExpert(expert);
+    }
+    localStorage.setItem('selected_chat_id', chat.id);
   };
 
   return (
-    <div className="flex h-screen">
-      {/* Left sidebar */}
-      <div className="w-64 border-r bg-gray-50 p-4 flex flex-col">
-        <div className="mb-4">
-          <ExpertSelector
-            experts={experts}
-            onSelect={async (expert: ExpertWithCapabilities) => {
-              setSelectedExpert(expert);
-              localStorage.setItem('selected_expert_id', expert.id);
-              await createNewChat(expert);
-            }}
-          />
-        </div>
+    <div className="flex h-screen bg-[#343541]">
+      {/* Sidebar */}
+      <div className="w-64 bg-[#202123] h-screen flex flex-col">
+        {/* New Chat Button */}
         <button
-          onClick={() => createNewChat(selectedExpert!)}
-          className="w-full bg-blue-500 text-white rounded-lg px-4 py-2 mb-4 hover:bg-blue-600"
+          onClick={handleNewChat}
+          className="flex items-center justify-center gap-3 p-3 text-[#FFFFFF] hover:bg-[#2A2B32] transition-colors duration-200 text-sm mb-2 border border-[#4E505E] rounded-lg mx-2 mt-2"
         >
+          <svg
+            stroke="currentColor"
+            fill="none"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            height="1em"
+            width="1em"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
           Новый чат
         </button>
-        <div className="flex-1 overflow-auto">
+
+        {/* Chat List */}
+        <div className="flex-1 overflow-y-auto">
           {chats.map((chat) => (
             <div
               key={chat.id}
-              className={`p-2 cursor-pointer hover:bg-gray-100 ${
-                currentChat?.id === chat.id ? 'bg-blue-100' : ''
+              onClick={() => handleChatSelect(chat)}
+              className={`p-3 text-sm cursor-pointer flex items-center gap-3 ${
+                currentChat?.id === chat.id
+                  ? 'bg-[#343541] text-[#FFFFFF]'
+                  : 'text-[#FFFFFF] hover:bg-[#2A2B32]'
               }`}
-              onClick={() => setCurrentChat(chat)}
             >
-              <div className="font-medium truncate">{chat.title}</div>
-              <div className="text-sm text-gray-500">
-                {chat.createdAt.toLocaleString()}
-              </div>
+              <svg
+                stroke="currentColor"
+                fill="none"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                height="1em"
+                width="1em"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              {chat.title || 'Новый чат'}
             </div>
           ))}
         </div>
+
+        {/* GitHub Link */}
+        <div className="p-4 border-t border-red-500">
+          <a 
+            href="https://github.com/LibreExpert/LibreExpert" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-red-500 hover:text-red-400 transition-colors flex flex-col items-center"
+          >
+            <div className="font-medium">LibreExpert</div>
+          </a>
+        </div>
       </div>
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col">
-        {selectedExpert && (
-          <>
-            <div className="border-b p-4">
-              <h2 className="text-lg font-semibold">{selectedExpert.name}</h2>
-              <p className="text-sm text-gray-600">{selectedExpert.description}</p>
+      {/* Main Content */}
+      {!selectedExpert ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="max-w-2xl w-full mx-auto px-6 py-8 bg-[#343541] rounded-lg">
+            <h1 className="text-3xl font-bold mb-8 text-center text-[#FFFFFF]">
+              Выберите эксперта для нового чата
+            </h1>
+            <div className="space-y-4">
+              <ExpertSelector onSelect={handleExpertSelect} selectedExpertId={null} />
             </div>
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {currentChat?.messages?.map((msg, index) => (
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 flex flex-col bg-[#343541]">
+            {/* Заголовок чата */}
+            {selectedExpert && (
+              <div className="flex items-center p-4 border-b border-[#565869] bg-[#343541]">
+                <div className="w-8 h-8 rounded-full bg-[#10A37F] flex items-center justify-center text-white mr-3">
+                  AI
+                </div>
+                <div>
+                  <h2 className="text-[#FFFFFF] font-medium">{selectedExpert.name}</h2>
+                  <p className="text-sm text-[#ACB2C0]">{selectedExpert.description}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Область сообщений */}
+            <ScrollArea className="flex-1 p-4 overflow-y-auto">
+              <div className="max-w-3xl mx-auto">
+                {currentChat?.messages.map((msg, index) => (
                   <div
                     key={index}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+                    className={`py-6 ${
+                      msg.role === 'assistant' ? 'bg-[#444654]' : ''
+                    } -mx-4 px-4`}
                   >
-                    <div
-                      className={`p-4 rounded-lg relative ${
-                        msg.role === 'user'
-                          ? 'bg-blue-100'
-                          : 'bg-gray-100'
-                      }`}
-                    >
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight]}
-                        className="prose prose-sm max-w-none dark:prose-invert"
-                        components={{
-                          pre: ({ children, ...props }) => {
-                            const codeElement = React.Children.toArray(children).find(
-                              (child): child is React.ReactElement => 
-                                React.isValidElement(child) && child.type === 'code'
-                            );
-                             
-                            return (
+                    <div className="max-w-3xl mx-auto flex gap-4">
+                      <div className="w-8 h-8 rounded-sm flex items-center justify-center shrink-0">
+                        {msg.role === 'assistant' ? (
+                          <div className="bg-[#10A37F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
+                            AI
+                          </div>
+                        ) : (
+                          <div className="bg-[#40414F] rounded-sm w-full h-full flex items-center justify-center text-[#FFFFFF]">
+                            U
+                          </div>
+                        )}
+                      </div>
+                      <div className="prose prose-invert flex-1">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                          components={{
+                            pre: ({ children, ...props }) => (
                               <div className="relative group">
-                                <pre {...props} className="bg-gray-900 p-4 rounded-lg overflow-x-auto">
+                                <pre
+                                  {...props}
+                                  className="bg-[#40414F] p-4 rounded-lg overflow-x-auto"
+                                >
                                   {children}
                                 </pre>
                                 <button
                                   onClick={() => {
-                                    if (codeElement && typeof codeElement.props.children === 'string') {
-                                      navigator.clipboard.writeText(codeElement.props.children);
+                                    const codeElement = React.Children.toArray(children).find(
+                                      (child): child is React.ReactElement =>
+                                        React.isValidElement(child) && child.type === 'code'
+                                    );
+                                    if (
+                                      codeElement &&
+                                      typeof codeElement.props.children === 'string'
+                                    ) {
+                                      navigator.clipboard.writeText(
+                                        codeElement.props.children
+                                      );
                                     }
                                   }}
-                                  className="absolute top-2 right-2 bg-gray-700 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute top-2 right-2 bg-[#2A2B32] text-[#FFFFFF] px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   Copy
                                 </button>
                               </div>
-                            );
-                          },
-                          code: ({ className, children, ...props }) => {
-                            const match = /language-(\w+)/.exec(className || '');
-                            return match ? (
-                              <code {...props} className={className}>
+                            ),
+                            code: ({ className, children, ...props }) => {
+                              const match = /language-(\w+)/.exec(className || '');
+                              return match ? (
+                                <code {...props} className={className}>
+                                  {children}
+                                </code>
+                              ) : (
+                                <code
+                                  {...props}
+                                  className="bg-[#40414F] px-1 py-0.5 rounded"
+                                >
+                                  {children}
+                                </code>
+                              );
+                            },
+                            p: ({ children }) => (
+                              <p className="text-[#FFFFFF] mb-4 last:mb-0">{children}</p>
+                            ),
+                            a: ({ children, href }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#10A37F] hover:underline"
+                              >
                                 {children}
-                              </code>
-                            ) : (
-                              <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">
-                                {children}
-                              </code>
-                            );
-                          },
-                          p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
-                          a: ({ children, href }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                              {children}
-                            </a>
-                          ),
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                      {msg.timestamp && (
-                        <div className={`text-[10px] text-gray-400 mt-1 leading-none ${msg.role === 'assistant' ? 'text-right' : ''}`}>
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      )}
+                              </a>
+                            ),
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 ))}
-                {currentChat?.messages?.map((msg, index) => (
-                  msg.role === 'assistant' && 
-                  msg.content.includes('Удалось ли решить вашу проблему?') && 
-                  !currentChat.problemResolved && (
-                    <div key={index} className="mt-2 flex space-x-2">
+                {currentChat &&
+                  !currentChat.problemResolved &&
+                  currentChat.messages.some(
+                    (msg) =>
+                      msg.role === 'assistant' &&
+                      msg.content.includes('Удалось ли решить вашу проблему?')
+                  ) && (
+                    <div className="mt-2 flex justify-center space-x-2">
                       <button
                         onClick={() => handleProblemResolution(true)}
-                        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                        className="px-3 py-1 bg-[#10A37F] text-[#FFFFFF] rounded hover:bg-[#0D926F] transition-colors"
                       >
                         Да, решено
                       </button>
                       <button
                         onClick={() => handleProblemResolution(false)}
-                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        className="px-3 py-1 bg-[#40414F] text-[#FFFFFF] rounded hover:bg-[#2A2B32] transition-colors"
                       >
                         Нет, нужна помощь
                       </button>
                     </div>
-                  )
-                ))}
+                  )}
               </div>
             </ScrollArea>
-            <div className="border-t border-gray-200 p-4">
-              <div className="flex space-x-4">
-                <textarea
-                  ref={textareaRef}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder="Введите сообщение..."
-                  className="flex-1 resize-none border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={1}
-                  style={{ height: '40px' }}
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={isLoading || !message.trim()}
-                  className={`${
-                    isLoading || !message.trim() 
-                      ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-blue-500 hover:bg-blue-600'
-                  } text-white rounded-lg px-6 py-2`}
-                >
-                  {isLoading ? 'Отправка...' : 'Отправить'}
-                </button>
+
+            {/* Message input */}
+            <div className="border-t border-[#565869] p-4">
+              <div className="max-w-3xl mx-auto">
+                <div className="relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      adjustTextareaHeight();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Отправьте сообщение..."
+                    className="w-full rounded-lg bg-[#40414F] text-[#FFFFFF] placeholder-[#ACB2C0] p-4 pr-12 resize-none overflow-hidden border border-[#565869] focus:outline-none focus:border-[#10A37F] focus:ring-1 focus:ring-[#10A37F]"
+                    style={{ minHeight: '60px' }}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={isLoading || message.trim() === ''}
+                    className={`absolute right-2 bottom-2 p-2 rounded-lg ${
+                      isLoading || message.trim() === ''
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'bg-[#10A37F] hover:bg-[#0D926F] text-[#FFFFFF]'
+                    }`}
+                  >
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M22 2L11 13"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M22 2L15 22L11 13L2 9L22 2Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
-          </> 
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

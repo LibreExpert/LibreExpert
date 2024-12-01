@@ -1,47 +1,88 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 model Expert {
   id                String   @id @default(cuid())
   name              String
-  description       String
-  systemPrompt      String   @map("system_prompt")
+  description       String?
+  systemPrompt      String?   @map("system_prompt")
   model             String
   provider          String
-  api_key           String?  @map("api_key")
-  temperature       Float
-  presencePenalty   Float    @map("presence_penalty")
-  frequencyPenalty  Float    @map("frequency_penalty")
-  topP              Float    @map("top_p")
-  capabilities      Json
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  api_key           String   @map("api_key")
+  temperature       Float     @default(0.7)
+  presencePenalty   Float     @default(0) @map("presence_penalty")
+  frequencyPenalty  Float    @default(0) @map("frequency_penalty")
+  topP              Float     @default(1) @map("top_p")
+  capabilities      Json      @default("{}")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  documents         Document[]
+  chats             Chat[]
 
   @@map("experts")
 }
 
 model Chat {
   id              String    @id @default(cuid())
-  expertId        String    @map("expertId")
-  browserId       String    @map("browserId")
-  title           String
-  messages        Json
-  createdAt       DateTime  @default(now()) @map("createdAt")
-  updatedAt       DateTime  @updatedAt @map("updatedAt")
-  lastActivity    DateTime  @map("lastActivity")
-  problemResolved Boolean   @default(false) @map("problemResolved")
+  expert          Expert    @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  expertId        String    @map("expert_id")
+  browserId       String    @map("browser_id")
+  title           String    @default("")
+  messages        Message[]
+  lastActivity    DateTime  @default(now()) @map("last_activity")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@index([browserId])
   @@map("chats")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String   @map("chat_id")
+  role      String
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("messages")
+}
+
+model Document {
+  id          String          @id @default(cuid())
+  expert      Expert          @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  expertId    String          @map("expert_id")
+  filename    String
+  content     String
+  chunks      DocumentChunk[]
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id          String   @id @default(cuid())
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId  String   @map("document_id")
+  content     String
+  embedding   Unsupported("vector(1536)")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("document_chunks")
 }
 
 model ApiKey {

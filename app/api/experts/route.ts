@@ -30,30 +30,41 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    console.log('Received expert data:', body);
+    const formData = await request.formData();
+    console.log('Received expert data:', Object.fromEntries(formData));
 
-    // Убедимся, что все числовые поля являются числами
+    // Parse capabilities from string to JSON if present
+    let capabilities = {
+      webBrowsing: false,
+      imageGeneration: false,
+      codeInterpreter: false
+    };
+    
+    const capabilitiesStr = formData.get('capabilities');
+    if (capabilitiesStr) {
+      try {
+        capabilities = JSON.parse(capabilitiesStr as string);
+      } catch (e) {
+        console.error('Error parsing capabilities:', e);
+      }
+    }
+
+    // Create expert data object
     const expertData = {
-      name: body.name,
-      description: body.description || '',
-      systemPrompt: body.systemPrompt || '',
-      model: body.model,
-      provider: body.provider,
-      api_key: body.api_key,
-      temperature: Number(body.temperature) || 0.7,
-      presencePenalty: Number(body.presencePenalty) || 0,
-      frequencyPenalty: Number(body.frequencyPenalty) || 0,
-      topP: Number(body.topP) || 1,
-      capabilities: body.capabilities || {
-        webBrowsing: false,
-        imageGeneration: false,
-        codeInterpreter: false
-      },
+      name: formData.get('name') as string,
+      description: formData.get('description') as string || '',
+      systemPrompt: formData.get('systemPrompt') as string || '',
+      model: formData.get('model') as string,
+      provider: formData.get('provider') as string,
+      api_key: formData.get('api_key') as string || 'sk-stub-key-' + Date.now(),
+      temperature: Number(formData.get('temperature')) || 0.7,
+      presencePenalty: Number(formData.get('presencePenalty')) || 0,
+      frequencyPenalty: Number(formData.get('frequencyPenalty')) || 0,
+      topP: Number(formData.get('topP')) || 1,
+      capabilities: capabilities
     };
 
-    console.log('Processed expert data:', expertData);
-
+    // Create the expert
     const expert = await prisma.expert.create({
       data: expertData,
       select: {
@@ -73,13 +84,9 @@ export async function POST(request: Request) {
       }
     });
 
-    console.log('Created expert:', expert);
     return NextResponse.json(expert);
   } catch (error) {
-    console.error('Detailed error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to create expert',
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    console.error('Error creating expert:', error);
+    return NextResponse.json({ error: 'Failed to create expert' }, { status: 500 });
   }
 }
