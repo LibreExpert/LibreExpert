@@ -1,11 +1,8 @@
 'use client'
 
-import React from 'react';
-import { useState, useEffect, useRef } from 'react';
-import { Expert } from '@/types/expert';
+import React, { useState, useEffect, useRef } from 'react';
+import { Expert } from '@prisma/client';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
-import defaultExperts from '../config/experts.json';
-import { ExpertSelector } from './ExpertSelector';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -21,63 +18,131 @@ interface Message {
 interface Chat {
   id: string;
   expertId: string;
-  messages: Message[];
-  createdAt: string;
+  browserId: string;
   title: string;
-  lastActivity: number;
-  problemResolved?: boolean;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
+  lastActivity: Date;
+  problemResolved: boolean;
+}
+
+interface ExpertWithCapabilities extends Omit<Expert, 'createdAt' | 'updatedAt'> {
+  capabilities: {
+    webBrowsing: boolean;
+    imageGeneration: boolean;
+    codeInterpreter: boolean;
+  };
 }
 
 export default function Chat() {
   const [message, setMessage] = useState('');
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
-  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
+  const [selectedExpert, setSelectedExpert] = useState<ExpertWithCapabilities | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [browserId, setBrowserId] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [experts, setExperts] = useState<ExpertWithCapabilities[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Constants
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-  // Load experts from localStorage
+  // Initialize browserId
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('experts');
-      if (stored) {
-        const experts = JSON.parse(stored);
-        const savedExpertId = localStorage.getItem('selected_expert_id');
-        const expert = savedExpertId 
-          ? experts.find((e: Expert) => e.id === savedExpertId)
-          : experts[0];
-          
-        if (expert) {
-          setSelectedExpert({
-            ...expert,
-            provider: expert.provider as 'openai' | 'google'
-          });
-        }
-      } else {
-        const defaultExpertsWithCapabilities = defaultExperts.experts.map(expert => ({
+    let id = localStorage.getItem('browserId');
+    if (!id) {
+      id = window.crypto.randomUUID();
+      localStorage.setItem('browserId', id);
+    }
+    setBrowserId(id);
+  }, []);
+
+  // Load experts from backend
+  useEffect(() => {
+    const loadExperts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/experts');
+        if (!response.ok) throw new Error('Failed to fetch experts');
+        const data = await response.json();
+        
+        const expertsWithCapabilities: ExpertWithCapabilities[] = data.map((expert: Expert) => ({
           ...expert,
-          provider: expert.provider as 'openai' | 'google',
           capabilities: {
             webBrowsing: false,
             imageGeneration: false,
             codeInterpreter: false
           }
         }));
-        setSelectedExpert(defaultExpertsWithCapabilities[0]);
+        
+        setExperts(expertsWithCapabilities);
+
+        // Set selected expert from localStorage or first expert
+        const savedExpertId = localStorage.getItem('selected_expert_id');
+        const expert = savedExpertId 
+          ? expertsWithCapabilities.find(e => e.id === savedExpertId)
+          : expertsWithCapabilities[0];
+          
+        if (expert && browserId) {
+          setSelectedExpert(expert);
+          // Создаем новый чат для выбранного эксперта, если нет текущего чата
+          if (!currentChat) {
+            createNewChat(expert);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading experts:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load experts');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading experts:', error);
-      const firstExpert = {
-        ...defaultExperts.experts[0],
-        provider: defaultExperts.experts[0].provider as 'openai' | 'google'
-      };
-      setSelectedExpert(firstExpert);
+    };
+
+    if (browserId) {
+      loadExperts();
     }
-  }, []);
+  }, [browserId, currentChat]);
+
+  // Load chats from backend
+  useEffect(() => {
+    const loadChats = async () => {
+      if (!browserId) return;
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/chats?browserId=${browserId}`);
+        if (!response.ok) throw new Error('Failed to fetch chats');
+        const data = await response.json();
+        
+        // Сортируем чаты по lastActivity в порядке убывания
+        const sortedChats = data.sort((a: Chat, b: Chat) => 
+          new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+        );
+        
+        setChats(sortedChats);
+        
+        // Если есть сохраненный ID чата, выбираем его
+        const savedChatId = localStorage.getItem('selected_chat_id');
+        if (savedChatId) {
+          const savedChat = sortedChats.find((chat: Chat) => chat.id === savedChatId);
+          if (savedChat) {
+            setCurrentChat(savedChat);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading chats:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load chats');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadChats();
+  }, [browserId]);
 
   // Load saved API keys on mount
   useEffect(() => {
@@ -96,7 +161,7 @@ export default function Chat() {
   useEffect(() => {
     const checkInactivity = async () => {
       if (currentChat && !currentChat.problemResolved) {
-        const timeSinceLastActivity = Date.now() - currentChat.lastActivity;
+        const timeSinceLastActivity = Date.now() - currentChat.lastActivity.getTime();
         
         if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
           const inactivityMessage: Message = {
@@ -140,25 +205,187 @@ export default function Chat() {
     };
   }, [currentChat, INACTIVITY_TIMEOUT]);
 
+  // Format chat title
+  const formatChatTitle = (content: string) => {
+    return content.length > 50 ? content.slice(0, 50) + '...' : content;
+  };
+
   // Create new chat
-  const createNewChat = () => {
-    if (!selectedExpert) return;
+  const createNewChat = async (expert: ExpertWithCapabilities) => {
     
+    
+    
+
+    if (!expert || !browserId) {
+      
+      return;
+    }
+
     const newChat: Chat = {
-      id: Date.now().toString(),
-      expertId: selectedExpert.id,
+      id: window.crypto.randomUUID(),
+      expertId: expert.id,
+      browserId: browserId,
       messages: [],
-      createdAt: new Date().toISOString(),
-      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`,
-      lastActivity: Date.now(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      title: `Чат с ${expert.name} ${new Date().toLocaleString()}`,
+      lastActivity: new Date(),
       problemResolved: false
     };
-    setChats(prev => {
-      const updatedChats = [newChat, ...prev];
-      localStorage.setItem('chats', JSON.stringify(updatedChats));
-      return updatedChats;
-    });
-    setCurrentChat(newChat);
+
+    
+
+    try {
+      // Save to backend first
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: newChat.id,
+          expertId: newChat.expertId,
+          browserId: newChat.browserId,
+          title: newChat.title,
+          messages: newChat.messages
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create chat on backend');
+      }
+
+      const savedChat = await response.json();
+      
+
+      // Update local state only after successful backend save
+      setChats(prev => {
+        const updatedChats = [...prev, savedChat].sort((a, b) => 
+          new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+        );
+        return updatedChats;
+      });
+      setCurrentChat(savedChat);
+    } catch (error) {
+      console.error('Error creating chat:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create chat');
+    }
+  };
+
+  // Handle sending message
+  const handleSend = async () => {
+    
+    
+    
+    
+    
+
+    if (!message.trim()) {
+      
+      return;
+    }
+    if (!currentChat) {
+      
+      return;
+    }
+    if (!selectedExpert) {
+      
+      return;
+    }
+    if (isLoading) {
+      
+      return;
+    }
+
+    setIsLoading(true);
+    const timestamp = Date.now();
+
+    try {
+      const userMessage: Message = {
+        role: 'user',
+        content: message.trim(),
+        timestamp
+      };
+
+      const updatedMessages = [...currentChat.messages, userMessage];
+      const updatedChat: Chat = {
+        ...currentChat,
+        messages: updatedMessages,
+        lastActivity: new Date()
+      };
+
+      setCurrentChat(updatedChat);
+      setChats(prev =>
+        prev.map(chat => (chat.id === updatedChat.id ? updatedChat : chat))
+      );
+
+      // Clear input
+      setMessage('');
+
+      // Scroll to bottom
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+
+      // Get AI response
+      const aiResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: updatedMessages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          expertId: selectedExpert.id
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const responseData = await aiResponse.json();
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: responseData.content,
+        timestamp: Date.now()
+      };
+
+      const finalMessages = [...updatedMessages, assistantMessage];
+      const finalChat: Chat = {
+        ...updatedChat,
+        messages: finalMessages,
+        lastActivity: new Date()
+      };
+
+      setCurrentChat(finalChat);
+      setChats(prev => {
+        const updatedChats = prev.map(chat => (chat.id === finalChat.id ? finalChat : chat))
+          .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+        return updatedChats;
+      });
+
+      // Save to backend
+      await fetch('/api/chats', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: finalChat.id,
+          browserId,
+          messages: finalMessages
+        })
+      });
+
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle problem resolution response
@@ -184,99 +411,46 @@ export default function Chat() {
     }
   }, [message]);
 
-  // Send message
-  const sendMessage = async () => {
-    if (!message.trim() || !selectedExpert || isLoading) return;
-
-    setIsLoading(true);
-    setMessage(''); // Очищаем инпут сразу
-
-    const updatedChat: Chat = currentChat ? {
-      ...currentChat,
-      lastActivity: Date.now()
-    } : {
-      id: Date.now().toString(),
-      expertId: selectedExpert.id,
-      messages: [],
-      createdAt: new Date().toISOString(),
-      title: `Чат с ${selectedExpert.name} ${new Date().toLocaleString()}`,
-      lastActivity: Date.now(),
-      problemResolved: false
-    };
-
-    const newMessage: Message = { 
-      role: 'user', 
-      content: message,
-      timestamp: Date.now()
-    };
-    updatedChat.messages = [...updatedChat.messages, newMessage];
-
-    try {
-      // Update chat state
-      if (!currentChat) {
-        setChats(prev => {
-          const newChats = [updatedChat, ...prev];
-          localStorage.setItem('chats', JSON.stringify(newChats));
-          return newChats;
-        });
-        setCurrentChat(updatedChat);
-      } else {
-        setChats(prev => {
-          const newChats = prev.map(chat => 
-            chat.id === currentChat.id ? updatedChat : chat
-          );
-          localStorage.setItem('chats', JSON.stringify(newChats));
-          return newChats;
-        });
-        setCurrentChat(updatedChat);
-      }
-
-      // Отправляем запрос к нашему API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: updatedChat.messages,
-          expertId: selectedExpert.id,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
-      }
-
-      const aiResponse = await response.json();
-
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: aiResponse.content,
-        timestamp: Date.now()
-      };
-
-      // Update chat with AI response
-      const chatWithResponse = {
-        ...updatedChat,
-        messages: [...updatedChat.messages, assistantMessage],
-        lastActivity: Date.now()
-      };
-
-      setChats(prev => {
-        const newChats = prev.map(chat => 
-          chat.id === chatWithResponse.id ? chatWithResponse : chat
-        );
-        localStorage.setItem('chats', JSON.stringify(newChats));
-        return newChats;
-      });
-      setCurrentChat(chatWithResponse);
-
-    } catch (error) {
-      console.error('Error:', error);
-      // toast.error('Ошибка при получении ответа от AI');
-    } finally {
-      setIsLoading(false);
-    }
+  // Expert selector component
+  const ExpertSelector = ({ experts, onSelect }: { 
+    experts: ExpertWithCapabilities[], 
+    onSelect: (expert: ExpertWithCapabilities) => void 
+  }) => {
+    return (
+      <div className="flex flex-wrap gap-4 p-4">
+        {experts.map((expert) => (
+          <button
+            key={expert.id}
+            onClick={() => onSelect(expert)}
+            className={`flex-1 min-w-[200px] p-4 rounded-lg border-2 transition-all ${
+              selectedExpert?.id === expert.id
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            <h3 className="font-medium text-lg mb-2">{expert.name}</h3>
+            <p className="text-gray-600 text-sm">{expert.description}</p>
+            <div className="mt-2 flex gap-2">
+              {expert.capabilities.webBrowsing && (
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  Веб-поиск
+                </span>
+              )}
+              {expert.capabilities.imageGeneration && (
+                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                  Генерация изображений
+                </span>
+              )}
+              {expert.capabilities.codeInterpreter && (
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                  Интерпретатор кода
+                </span>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -285,19 +459,16 @@ export default function Chat() {
       <div className="w-64 border-r bg-gray-50 p-4 flex flex-col">
         <div className="mb-4">
           <ExpertSelector
-            selectedExpertId={selectedExpert?.id || null}
-            onSelect={(expert) => {
-              setSelectedExpert({
-                ...expert,
-                provider: expert.provider as 'openai' | 'google'
-              });
+            experts={experts}
+            onSelect={async (expert: ExpertWithCapabilities) => {
+              setSelectedExpert(expert);
               localStorage.setItem('selected_expert_id', expert.id);
-              setCurrentChat(null);
+              await createNewChat(expert);
             }}
           />
         </div>
         <button
-          onClick={createNewChat}
+          onClick={() => createNewChat(selectedExpert!)}
           className="w-full bg-blue-500 text-white rounded-lg px-4 py-2 mb-4 hover:bg-blue-600"
         >
           Новый чат
@@ -313,7 +484,7 @@ export default function Chat() {
             >
               <div className="font-medium truncate">{chat.title}</div>
               <div className="text-sm text-gray-500">
-                {new Date(chat.createdAt).toLocaleString()}
+                {chat.createdAt.toLocaleString()}
               </div>
             </div>
           ))}
@@ -330,7 +501,7 @@ export default function Chat() {
             </div>
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
-                {currentChat?.messages.map((msg, index) => (
+                {currentChat?.messages?.map((msg, index) => (
                   <div
                     key={index}
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
@@ -401,7 +572,7 @@ export default function Chat() {
                     </div>
                   </div>
                 ))}
-                {currentChat?.messages.map((msg, index) => (
+                {currentChat?.messages?.map((msg, index) => (
                   msg.role === 'assistant' && 
                   msg.content.includes('Удалось ли решить вашу проблему?') && 
                   !currentChat.problemResolved && (
@@ -432,7 +603,7 @@ export default function Chat() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      sendMessage();
+                      handleSend();
                     }
                   }}
                   placeholder="Введите сообщение..."
@@ -441,7 +612,7 @@ export default function Chat() {
                   style={{ height: '40px' }}
                 />
                 <button
-                  onClick={sendMessage}
+                  onClick={handleSend}
                   disabled={isLoading || !message.trim()}
                   className={`${
                     isLoading || !message.trim() 
