@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
-import { promises as fs } from 'fs'
 import { Expert } from '@/types/expert'
 import { AIService } from '@/src/services/ai.service'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
-
-const expertsPath = path.join(process.cwd(), 'config/experts.json')
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { messages, expertId } = body
 
-    // Загружаем конфигурацию экспертов
-    const fileContents = await fs.readFile(expertsPath, 'utf8')
-    const { experts } = JSON.parse(fileContents)
-    const expert = experts.find((e: Expert) => e.id === expertId)
+    // Получаем эксперта из базы данных
+    const expert = await prisma.expert.findUnique({
+      where: {
+        id: expertId
+      }
+    })
 
     if (!expert) {
       return NextResponse.json(
@@ -41,9 +40,9 @@ export async function POST(request: NextRequest) {
       apiKey,
       expert.model,
       expert.temperature,
-      expert.presence_penalty,
-      expert.frequency_penalty,
-      expert.top_p,
+      expert.presencePenalty,
+      expert.frequencyPenalty,
+      expert.topP,
       expert.provider
     )
 
