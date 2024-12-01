@@ -28,6 +28,16 @@ interface Chat {
   problemResolved: boolean;
 }
 
+// Функция для генерации UUID v4
+function generateUUID() {
+  let d = new Date().getTime();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (d + Math.random() * 16) % 16 | 0;
+    d = Math.floor(d / 16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 export default function Chat() {
   const router = useRouter();
   const [message, setMessage] = useState('');
@@ -38,7 +48,7 @@ export default function Chat() {
   const [browserId, setBrowserId] = useState<string>(() => {
     let id = localStorage.getItem('browserId');
     if (!id) {
-      id = window.crypto.randomUUID();
+      id = generateUUID();
       localStorage.setItem('browserId', id);
     }
     return id;
@@ -179,7 +189,7 @@ export default function Chat() {
     }
 
     const newChat: Chat = {
-      id: window.crypto.randomUUID(),
+      id: generateUUID(),
       expertId: expert.id,
       browserId: browserId,
       messages: [],
