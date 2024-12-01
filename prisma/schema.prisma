@@ -31,14 +31,14 @@ model Expert {
 
 model Chat {
   id              String    @id @default(cuid())
-  expertId        String    @map("expertId")
-  browserId       String    @map("browserId")
+  expertId        String    @map("expert_id")
+  browserId       String    @map("browser_id")
   title           String
   messages        Json
-  createdAt       DateTime  @default(now()) @map("createdAt")
-  updatedAt       DateTime  @updatedAt @map("updatedAt")
-  lastActivity    DateTime  @map("lastActivity")
-  problemResolved Boolean   @default(false) @map("problemResolved")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastActivity    DateTime  @map("last_activity")
+  problemResolved Boolean   @default(false) @map("problem_resolved")
 
   @@index([browserId])
   @@map("chats")
