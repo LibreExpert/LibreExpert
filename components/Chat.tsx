@@ -412,8 +412,6 @@ export default function Chat() {
             className="text-red-500 hover:text-red-400 transition-colors flex flex-col items-center"
           >
             <div className="font-medium">LibreExpert</div>
-            <div className="text-sm">и ссылку</div>
-            <div className="text-sm">на репозиторий</div>
           </a>
         </div>
       </div>
