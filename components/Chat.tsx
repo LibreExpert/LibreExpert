@@ -109,17 +109,35 @@ export default function Chat() {
 
   // Load chats from backend
   useEffect(() => {
-    if (!browserId) return;
-
     const loadChats = async () => {
+      if (!browserId) return;
+
       try {
+        setLoading(true);
         const response = await fetch(`/api/chats?browserId=${browserId}`);
         if (!response.ok) throw new Error('Failed to fetch chats');
         const data = await response.json();
-        setChats(data);
+        
+        // Сортируем чаты по lastActivity в порядке убывания
+        const sortedChats = data.sort((a: Chat, b: Chat) => 
+          new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+        );
+        
+        setChats(sortedChats);
+        
+        // Если есть сохраненный ID чата, выбираем его
+        const savedChatId = localStorage.getItem('selected_chat_id');
+        if (savedChatId) {
+          const savedChat = sortedChats.find((chat: Chat) => chat.id === savedChatId);
+          if (savedChat) {
+            setCurrentChat(savedChat);
+          }
+        }
       } catch (error) {
         console.error('Error loading chats:', error);
-        setError('Failed to load chats');
+        setError(error instanceof Error ? error.message : 'Failed to load chats');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -241,7 +259,12 @@ export default function Chat() {
       console.log('Chat saved on backend:', savedChat);
 
       // Update local state only after successful backend save
-      setChats(prev => [...prev, savedChat]);
+      setChats(prev => {
+        const updatedChats = [...prev, savedChat].sort((a, b) => 
+          new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+        );
+        return updatedChats;
+      });
       setCurrentChat(savedChat);
     } catch (error) {
       console.error('Error creating chat:', error);
@@ -338,9 +361,11 @@ export default function Chat() {
       };
 
       setCurrentChat(finalChat);
-      setChats(prev =>
-        prev.map(chat => (chat.id === finalChat.id ? finalChat : chat))
-      );
+      setChats(prev => {
+        const updatedChats = prev.map(chat => (chat.id === finalChat.id ? finalChat : chat))
+          .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+        return updatedChats;
+      });
 
       // Save to backend
       await fetch('/api/chats', {
