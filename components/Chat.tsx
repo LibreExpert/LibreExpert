@@ -212,12 +212,12 @@ export default function Chat() {
 
   // Create new chat
   const createNewChat = async (expert: ExpertWithCapabilities) => {
-    console.log('Creating new chat...');
-    console.log('Expert:', expert);
-    console.log('Browser ID:', browserId);
+    
+    
+    
 
     if (!expert || !browserId) {
-      console.log('Missing required data:', { expert, browserId });
+      
       return;
     }
 
@@ -233,7 +233,7 @@ export default function Chat() {
       problemResolved: false
     };
 
-    console.log('New chat created:', newChat);
+    
 
     try {
       // Save to backend first
@@ -256,7 +256,7 @@ export default function Chat() {
       }
 
       const savedChat = await response.json();
-      console.log('Chat saved on backend:', savedChat);
+      
 
       // Update local state only after successful backend save
       setChats(prev => {
@@ -274,26 +274,26 @@ export default function Chat() {
 
   // Handle sending message
   const handleSend = async () => {
-    console.log('Trying to send message...');
-    console.log('Message:', message);
-    console.log('Current Chat:', currentChat);
-    console.log('Selected Expert:', selectedExpert);
-    console.log('Is Loading:', isLoading);
+    
+    
+    
+    
+    
 
     if (!message.trim()) {
-      console.log('Message is empty');
+      
       return;
     }
     if (!currentChat) {
-      console.log('No current chat');
+      
       return;
     }
     if (!selectedExpert) {
-      console.log('No expert selected');
+      
       return;
     }
     if (isLoading) {
-      console.log('Is loading');
+      
       return;
     }
 
